@@ -1,0 +1,224 @@
+---
+# Ansible bootstrap.yml
+- hosts: all
+  become: yes
+  vars:
+    kubernetes_version: "1.29"
+    pod_network_cidr: "10.244.0.0/16"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade system packages
+      apt:
+        upgrade: yes
+
+    - name: Install dependencies
+      apt:
+        name: 
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Add Helm GPG key
+      shell: curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | tee /usr/share/keyrings/helm.gpg > /dev/null
+      args:
+        creates: /usr/share/keyrings/helm.gpg
+
+    - name: Add Helm repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+        state: present
+        filename: helm-stable-debian
+        update_cache: yes  # Add this line to update cache after adding repo
+
+    - name: Install Helm
+      apt:
+        name: helm
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install containerd
+      apt:
+        name: containerd.io
+        state: present
+
+    - name: Create containerd config directory
+      file:
+        path: /etc/containerd
+        state: directory
+
+    - name: Configure containerd
+      shell: |
+        containerd config default | tee /etc/containerd/config.toml
+        sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+      notify: Restart containerd
+
+    - name: Configure containerd
+      shell: |
+        containerd config default > /etc/containerd/config.toml
+        sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+        sed -i 's/disabled_plugins = \[\"cri\"\]/enabled_plugins = \[\"cri\"\]/' /etc/containerd/config.toml
+      notify: Restart containerd
+
+    - name: Enable and restart containerd
+      systemd:
+        name: containerd
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+      
+    # Add a small delay to ensure containerd is fully ready
+    - name: Wait for containerd to be ready
+      wait_for:
+        path: /run/containerd/containerd.sock
+        state: present
+        delay: 5
+        timeout: 30
+
+    - name: Add Kubernetes GPG key
+      apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key
+        state: present
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: "deb https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /"
+        state: present
+
+    - name: Install Kubernetes packages
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: Hold Kubernetes packages
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Disable swap
+      command: swapoff -a
+      changed_when: false
+
+    - name: Remove swap from fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: Configure kernel modules
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Load kernel modules
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Configure sysctl parameters
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+        - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+        - { name: 'net.ipv4.ip_forward', value: '1' }
+        - { name: 'vm.swappiness', value: '0' }
+        - { name: 'net.ipv4.conf.all.forwarding', value: '1' }
+        # Add these for better k8s networking performance
+        - { name: 'net.core.somaxconn', value: '32768' }
+        - { name: 'net.ipv4.tcp_max_syn_backlog', value: '8096' }
+        - { name: 'net.ipv4.tcp_tw_reuse', value: '1' }
+
+    - name: Initialize Kubernetes cluster
+      command: >
+        kubeadm init
+        --pod-network-cidr={{ pod_network_cidr }}
+        --skip-phases=addon/kube-proxy
+      register: kubeadm_init
+      changed_when: kubeadm_init.rc == 0
+      failed_when: 
+        - kubeadm_init.rc != 0
+        - "'already exists' not in kubeadm_init.stderr"
+
+    - name: Create .kube directory
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+
+    - name: Copy admin.conf to root's .kube directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0600'
+
+    - name: Install Cilium
+      block:
+        - name: Add Cilium helm repository
+          kubernetes.core.helm_repository:
+            name: cilium
+            repo_url: https://helm.cilium.io/
+
+        - name: Install Cilium
+          kubernetes.core.helm:
+            name: cilium
+            chart_ref: cilium/cilium
+            release_namespace: kube-system
+            values:
+              kubeProxyReplacement: true  # Changed from 'strict' to true
+              k8sServiceHost: "{{ ansible_host }}"  # Add host IP
+              k8sServicePort: 6443  # Add API port
+
+    - name: Install additional system utilities
+      apt:
+        name: 
+          - ipvsadm  # For better k8s service proxy
+          - jq       # For JSON processing
+          - nfs-common  # For storage support
+        state: present
+
+    - name: Remove control-plane taint
+      command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+      register: taint_result
+      changed_when: taint_result.rc == 0
+      failed_when:
+        - taint_result.rc != 0
+        - "'not found' not in taint_result.stderr"
+
+  handlers:
+    - name: Restart containerd
+      service:
+        name: containerd
+        state: restarted
