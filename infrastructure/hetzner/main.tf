@@ -5,8 +5,8 @@ provider "hcloud" {
 resource "hcloud_server" "k8s_node" {
   name        = "k8s-master"
   image       = "debian-12"
-  server_type = "cx22"
-  location    = "fsn1"
+  server_type = "cx22" 
+  location    = "fsn1" # Rotate between fsn1, nbg1, hel1
   ssh_keys    = [hcloud_ssh_key.default.id]
 
   labels = {
