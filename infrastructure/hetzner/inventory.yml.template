@@ -1,0 +1,5 @@
+all:
+  hosts:
+    k8s_master:
+      ansible_host: KUBERNETES_MASTER_IP  # This will be replaced by the script
+      ansible_user: root
