@@ -1,5 +1,5 @@
 all:
   hosts:
     k8s_master:
-      ansible_host: 188.245.235.142  # This will be replaced by the script
+      ansible_host: 116.202.97.27  # This will be replaced by the script
       ansible_user: root
