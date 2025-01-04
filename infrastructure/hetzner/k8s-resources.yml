@@ -1,0 +1,188 @@
+---
+# Handles containers and k8s manifests state at the dirs specified below
+- hosts: all
+  become: yes
+  vars_files:
+    - secret_vars.yml
+  vars:
+    docker_images_path: "../../kubernetes/dockerfiles"
+    k8s_manifests_path: "../../kubernetes/base/manifests"
+    registry_name: "local-registry"
+    registry_port: "5000"
+    ansible_become_pass: "{{ ansible_become_pass }}"
+  
+  pre_tasks:
+    # Check Kubernetes initialization
+    - name: Check if Kubernetes is initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_check
+
+    - name: Fail if Kubernetes is not initialized
+      fail:
+        msg: "Kubernetes is not initialized. Please run bootstrap.yml first"
+      when: not k8s_check.stat.exists
+
+    # Check local Docker prerequisites
+    - name: Check if Docker is installed locally
+      command: docker --version
+      delegate_to: localhost
+      become: no
+      register: docker_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Fail if Docker is not installed
+      fail:
+        msg: "Docker is not installed on localhost. Please install Docker first."
+      when: docker_check.rc != 0
+      delegate_to: localhost
+      become: no
+
+    - name: Check if Docker is running locally
+      command: docker info
+      delegate_to: localhost
+      become: no
+      register: docker_running
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Fail if Docker is not running
+      fail:
+        msg: "Docker is not running on localhost. Please start Docker service."
+      when: docker_running.rc != 0
+      delegate_to: localhost
+      become: no
+
+    # Check and create local registry if needed
+    - name: Check if registry container exists
+      shell: docker ps -a --filter name={{ registry_name }} --format "{% raw %}{{.Names}}{% endraw %}"
+      delegate_to: localhost
+      become: no
+      register: registry_exists
+      changed_when: false
+
+    - name: Check if registry is running
+      shell: docker ps --filter name={{ registry_name }} --format "{% raw %}{{.Names}}{% endraw %}"
+      delegate_to: localhost
+      become: no
+      register: registry_running
+      changed_when: false
+
+    - name: Start registry if exists but not running
+      command: docker start {{ registry_name }}
+      delegate_to: localhost
+      become: no
+      when: 
+        - registry_exists.stdout == registry_name
+        - registry_running.stdout != registry_name
+
+    - name: Create registry if doesn't exist
+      command: docker run -d --restart always -p {{ registry_port }}:5000 --name {{ registry_name }} registry:2
+      delegate_to: localhost
+      become: no
+      when: registry_exists.stdout != registry_name
+
+    - name: Wait for registry to be ready
+      uri:
+        url: "http://localhost:{{ registry_port }}/v2/_catalog"
+        method: GET
+      register: registry_health
+      until: registry_health.status == 200
+      retries: 5
+      delay: 2
+      delegate_to: localhost
+      become: no
+
+    - name: Ensure required python packages are installed
+      apt:
+        name: 
+          - python3-pip
+          - python3-dev
+          - python3-kubernetes
+        state: present
+        update_cache: yes
+      delegate_to: localhost
+      become: yes
+
+  
+  tasks:
+    - name: Find all Dockerfiles
+      find:
+        paths: "{{ docker_images_path }}"
+        patterns: "Dockerfile"
+        recurse: yes
+      delegate_to: localhost
+      become: no
+      register: dockerfiles
+
+    - name: Calculate Dockerfile checksums
+      stat:
+        path: "{{ item.path }}"
+      delegate_to: localhost
+      become: no
+      register: dockerfile_stats
+      loop: "{{ dockerfiles.files }}"
+
+    - name: Build Docker images
+      docker_image:
+        build:
+          path: "{{ item.stat.path | dirname }}"
+          pull: yes
+        name: "localhost:{{ registry_port }}/{{ item.stat.path | dirname | basename }}"
+        tag: latest
+        source: build
+        force_source: "{{ item.stat.checksum_mismatch | default(false) }}"
+      loop: "{{ dockerfile_stats.results }}"
+      delegate_to: localhost
+      become: no
+    
+    - name: Save Docker images
+      shell: |
+        docker save -o "/tmp/{{ item.stat.path | dirname | basename }}.tar" \
+        localhost:5000/{{ item.stat.path | dirname | basename }}:latest
+      loop: "{{ dockerfile_stats.results }}"
+      delegate_to: localhost
+      become: no
+      changed_when: false
+    
+    - name: Copy image to remote host
+      copy:
+        src: "/tmp/{{ item.stat.path | dirname | basename }}.tar"
+        dest: "/tmp/{{ item.stat.path | dirname | basename }}.tar"
+      loop: "{{ dockerfile_stats.results }}"
+      delegate_to: k8s_master
+      become: yes
+    
+    - name: Import image to containerd
+      shell: |
+        ctr -n=k8s.io images import "/tmp/{{ item.stat.path | dirname | basename }}.tar"
+      loop: "{{ dockerfile_stats.results }}"
+      delegate_to: k8s_master
+      become: yes
+      changed_when: false
+
+    - name: Find all K8s manifests
+      find:
+        paths: "{{ k8s_manifests_path }}"
+        patterns: "*.yaml,*.yml"
+        recurse: no
+      delegate_to: localhost
+      become: no
+      register: k8s_files
+
+    - name: Apply K8s manifests
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ item.path }}"
+      loop: "{{ k8s_files.files }}"
+      delegate_to: localhost  # Run this task on the local machine
+      become: no
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Create CIS reports directory
+      file:
+        path: /var/log/cis-linux-and-kube-bench
+        state: directory
+        mode: '0755'
