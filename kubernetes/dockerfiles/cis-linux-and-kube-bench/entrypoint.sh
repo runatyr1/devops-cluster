@@ -11,7 +11,8 @@ linux-bench \
     --json \
     --outputfile "$CIS_LINUX_REPORT" \
     --include-test-output \
-    --logtostderr
+    --logtostderr \
+    --config-dir ./cfg/
 
 echo "Linux CIS Report generated at: $CIS_LINUX_REPORT"
 

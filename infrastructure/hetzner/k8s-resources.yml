@@ -107,6 +107,8 @@
 
   
   tasks:
+    # Always rebuilds all images, I've tried tracking file content, it's cumbersome
+    # Probably would need other method than ansible
     - name: Find all Dockerfiles
       find:
         paths: "{{ docker_images_path }}"
@@ -115,49 +117,49 @@
       delegate_to: localhost
       become: no
       register: dockerfiles
-
-    - name: Calculate Dockerfile checksums
-      stat:
-        path: "{{ item.path }}"
-      delegate_to: localhost
-      become: no
-      register: dockerfile_stats
-      loop: "{{ dockerfiles.files }}"
-
+    
     - name: Build Docker images
       docker_image:
         build:
-          path: "{{ item.stat.path | dirname }}"
+          path: "{{ item.path | dirname }}"
           pull: yes
-        name: "localhost:{{ registry_port }}/{{ item.stat.path | dirname | basename }}"
+        name: "localhost:{{ registry_port }}/{{ item.path | dirname | basename }}"
         tag: latest
         source: build
-        force_source: "{{ item.stat.checksum_mismatch | default(false) }}"
-      loop: "{{ dockerfile_stats.results }}"
+        force_source: yes
+      loop: "{{ dockerfiles.files }}"
       delegate_to: localhost
       become: no
-    
+        
     - name: Save Docker images
       shell: |
-        docker save -o "/tmp/{{ item.stat.path | dirname | basename }}.tar" \
-        localhost:5000/{{ item.stat.path | dirname | basename }}:latest
-      loop: "{{ dockerfile_stats.results }}"
+        docker save -o "/tmp/{{ item.path | dirname | basename }}.tar" \
+        localhost:5000/{{ item.path | dirname | basename }}:latest
+      loop: "{{ dockerfiles.files }}"
       delegate_to: localhost
       become: no
       changed_when: false
     
     - name: Copy image to remote host
       copy:
-        src: "/tmp/{{ item.stat.path | dirname | basename }}.tar"
-        dest: "/tmp/{{ item.stat.path | dirname | basename }}.tar"
-      loop: "{{ dockerfile_stats.results }}"
+        src: "/tmp/{{ item.path | dirname | basename }}.tar"
+        dest: "/tmp/{{ item.path | dirname | basename }}.tar"
+      loop: "{{ dockerfiles.files }}"
       delegate_to: k8s_master
       become: yes
     
+    - name: Remove existing image from containerd
+      shell: |
+        ctr -n=k8s.io image rm localhost:5000/{{ item.path | dirname | basename }}:latest || true
+      loop: "{{ dockerfiles.files }}"
+      delegate_to: k8s_master
+      become: yes
+      changed_when: false
+    
     - name: Import image to containerd
       shell: |
-        ctr -n=k8s.io images import "/tmp/{{ item.stat.path | dirname | basename }}.tar"
-      loop: "{{ dockerfile_stats.results }}"
+        ctr -n=k8s.io images import "/tmp/{{ item.path | dirname | basename }}.tar"
+      loop: "{{ dockerfiles.files }}"
       delegate_to: k8s_master
       become: yes
       changed_when: false
