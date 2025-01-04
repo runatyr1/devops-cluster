@@ -1,0 +1,101 @@
+---
+# ServiceAccount for CIS checks
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cis-checker
+  namespace: default
+---
+# ClusterRole with necessary permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cis-checker
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "namespaces"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets"]
+  verbs: ["get", "list"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+  verbs: ["get", "list"]
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  verbs: ["get", "list"]
+---
+# Bind the ClusterRole to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cis-checker
+subjects:
+- kind: ServiceAccount
+  name: cis-checker
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cis-checker
+  apiGroup: rbac.authorization.k8s.io
+---
+# CronJob for running checks
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cis-compliance-check
+  namespace: default
+spec:
+  schedule: "0 0 * * *"  # Run daily at midnight
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 2
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: cis-checker
+          containers:
+          - name: cis-checker
+            image: localhost:5000/cis-linux-and-kube-bench:latest
+            imagePullPolicy: Never 
+            securityContext:
+              privileged: true  # Required for system checks
+              runAsUser: 0      # Run as root
+              runAsGroup: 0
+            volumeMounts:
+            - name: reports
+              mountPath: /reports
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+            - name: host-proc
+              mountPath: /proc
+              readOnly: true
+            - name: host-etc
+              mountPath: /etc
+              readOnly: true
+          volumes:
+          - name: reports
+            hostPath:
+              path: /var/log/cis-linux-and-kube-bench
+              type: DirectoryOrCreate
+          - name: host-root
+            hostPath:
+              path: /
+              type: Directory
+          - name: host-proc
+            hostPath:
+              path: /proc
+              type: Directory
+          - name: host-etc
+            hostPath:
+              path: /etc
+              type: Directory
+          restartPolicy: OnFailure
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
