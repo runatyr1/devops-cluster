@@ -22,6 +22,8 @@ kube-bench run \
     --json \
     --outputfile "$CIS_KUBE_REPORT" \
     --include-test-output \
-    --logtostderr
+    --logtostderr \
+    --config-dir ./cfg-kube/ \
+    --benchmark cis-1.24
 
 echo "Kubernetes CIS Report generated at: $CIS_KUBE_REPORT"
