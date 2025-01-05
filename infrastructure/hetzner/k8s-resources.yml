@@ -7,9 +7,21 @@
   vars:
     docker_images_path: "../../kubernetes/dockerfiles"
     k8s_manifests_path: "../../kubernetes/base/manifests"
+    helm_charts_path: "../../kubernetes/base/helm" 
     registry_name: "local-registry"
     registry_port: "5000"
     ansible_become_pass: "{{ ansible_become_pass }}"
+    helm_deployments:
+      - name: "white"
+        namespace: "white"
+        chart: "oci://registry-1.docker.io/bitnamicharts/nginx"  # Using OCI registry
+        repository: ""  # No repository needed for OCI registry
+        values_file: "{{ helm_charts_path }}/white/values.yaml"
+      - name: "black"
+        namespace: "black"
+        chart: "oci://registry-1.docker.io/bitnamicharts/nginx"
+        repository: ""
+        values_file: "{{ helm_charts_path }}/black/values.yaml"
   
   pre_tasks:
     # Check Kubernetes initialization
@@ -23,7 +35,7 @@
         msg: "Kubernetes is not initialized. Please run bootstrap.yml first"
       when: not k8s_check.stat.exists
 
-    # Check local Docker prerequisites
+    # Container pre-tasks:
     - name: Check if Docker is installed locally
       command: docker --version
       delegate_to: localhost
@@ -54,7 +66,6 @@
       delegate_to: localhost
       become: no
 
-    # Check and create local registry if needed
     - name: Check if registry container exists
       shell: docker ps -a --filter name={{ registry_name }} --format "{% raw %}{{.Names}}{% endraw %}"
       delegate_to: localhost
@@ -107,6 +118,8 @@
 
   
   tasks:
+
+    # Container tasks:
     # Always rebuilds all images, I've tried tracking file content, it's cumbersome
     # Probably would need other method than ansible
     - name: Find all Dockerfiles
@@ -164,6 +177,14 @@
       become: yes
       changed_when: false
 
+    # Created needed dirs in host:
+    - name: Create CIS reports directory
+      file:
+        path: /var/log/cis-linux-and-kube-bench
+        state: directory
+        mode: '0755'
+
+    # Apply kuberentes config:
     - name: Find all K8s manifests
       find:
         paths: "{{ k8s_manifests_path }}"
@@ -183,8 +204,27 @@
       vars:
         ansible_python_interpreter: /usr/bin/python3
 
-    - name: Create CIS reports directory
-      file:
-        path: /var/log/cis-linux-and-kube-bench
-        state: directory
-        mode: '0755'
+# Adding repos disabled as we are using OCI registry, but it might be needed later 
+#    - name: Add Helm repositories
+#      kubernetes.core.helm_repository:
+#        name: "{{ item.name }}"
+#        repo_url: "{{ item.url }}"
+#      loop:
+#        - { name: nginx, url: https://nginx.github.io/helm-charts }
+#      delegate_to: localhost
+#      become: no
+
+    - name: Deploy Helm charts
+      kubernetes.core.helm:
+        name: "{{ item.name }}"
+        chart_ref: "{{ item.chart }}"
+        release_namespace: "{{ item.namespace }}"
+        create_namespace: true
+        values_files: 
+          - "{{ item.values_file }}"
+        wait: true
+        wait_timeout: "300s"  # Changed from 300 to "300s"
+        force: false
+      loop: "{{ helm_deployments }}"
+      delegate_to: localhost
+      become: no

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: white-black-tests
+  namespace: black
+data:
+  run-tests.sh: |
+    #!/bin/bash
+    
+    # Install required tools
+    apk add --no-cache strace curl
+
+    while true; do
+      # Syscall tests
+      date >> /var/log/cka-tests/test-syscalls.log
+      strace -c sleep 1 2>> /var/log/cka-tests/test-syscalls.log
+      
+      # AppArmor tests
+      date >> /var/log/cka-tests/tests-apparmor.logs
+      # Note: aa-status isn't available in Alpine by default
+      # Instead, we can check AppArmor status through proc
+      if [ -f /sys/kernel/security/apparmor/profiles ]; then
+        cat /sys/kernel/security/apparmor/profiles >> /var/log/cka-tests/tests-apparmor.logs
+      else
+        echo "AppArmor not available" >> /var/log/cka-tests/tests-apparmor.logs
+      fi
+      
+      # Inter-service tests
+      if echo "${HOSTNAME}" | grep -q "white"; then
+        curl -s http://black-service.black.svc.cluster.local >> /var/log/cka-tests/test-syscalls.log
+      else
+        curl -s http://white-service.white.svc.cluster.local >> /var/log/cka-tests/test-syscalls.log
+      fi
+      
+      sleep 5
+    done
