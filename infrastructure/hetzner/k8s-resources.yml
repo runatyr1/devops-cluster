@@ -184,7 +184,7 @@
         state: directory
         mode: '0755'
 
-    # Apply kuberentes config:
+    # Apply kuberentes config, this updates resources, but doesn't delete:
     - name: Find all K8s manifests
       find:
         paths: "{{ k8s_manifests_path }}"
@@ -198,6 +198,7 @@
       kubernetes.core.k8s:
         state: present
         src: "{{ item.path }}"
+        apply: yes
       loop: "{{ k8s_files.files }}"
       delegate_to: localhost  # Run this task on the local machine
       become: no

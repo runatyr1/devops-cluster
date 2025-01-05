@@ -1,35 +1,55 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: white-black-tests
+  name: black-tests
   namespace: black
 data:
   run-tests.sh: |
     #!/bin/bash
     
-    # Install required tools
-    apk add --no-cache strace curl
+    # Define constants
+    COLOR="black"
+    LOG_DIR="/var/log/cka-tests-${COLOR}"
+    
+    # Create the log directory if it doesn't exist
+    mkdir -p "${LOG_DIR}"
+    
+    # Function to install dependencies with retry
+    install_deps() {
+      if ! (apt-get update && apt-get install -y strace curl); then
+        echo "Failed to install dependencies at $(date)" >> "${LOG_DIR}/install-error.log"
+        return 1
+      fi
+      return 0
+    }
+
+    # Keep trying to install dependencies until successful
+    until install_deps; do
+      sleep 5
+    done
 
     while true; do
       # Syscall tests
-      date >> /var/log/cka-tests/test-syscalls.log
-      strace -c sleep 1 2>> /var/log/cka-tests/test-syscalls.log
+      date >> "${LOG_DIR}/test-syscalls.log"
+      strace -c sleep 1 2>> "${LOG_DIR}/test-syscalls.log"
       
       # AppArmor tests
-      date >> /var/log/cka-tests/tests-apparmor.logs
+      date >> "${LOG_DIR}/tests-apparmor.logs"
       # Note: aa-status isn't available in Alpine by default
       # Instead, we can check AppArmor status through proc
       if [ -f /sys/kernel/security/apparmor/profiles ]; then
-        cat /sys/kernel/security/apparmor/profiles >> /var/log/cka-tests/tests-apparmor.logs
+        cat /sys/kernel/security/apparmor/profiles >> "${LOG_DIR}/tests-apparmor.logs"
       else
-        echo "AppArmor not available" >> /var/log/cka-tests/tests-apparmor.logs
+        echo "AppArmor not available" >> "${LOG_DIR}/tests-apparmor.logs"
       fi
       
       # Inter-service tests
-      if echo "${HOSTNAME}" | grep -q "white"; then
-        curl -s http://black-service.black.svc.cluster.local >> /var/log/cka-tests/test-syscalls.log
+      if hostname | grep -q white; then
+          # If we're on white, curl black
+          curl http://black-service.black.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
       else
-        curl -s http://white-service.white.svc.cluster.local >> /var/log/cka-tests/test-syscalls.log
+          # If we're not on white, curl white
+          curl http://white-service.white.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
       fi
       
       sleep 5

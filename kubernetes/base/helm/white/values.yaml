@@ -22,34 +22,39 @@ service:
     http: 80
     https: 443
 
-persistence:
-  enabled: true
-  hostPath:
-    path: /var/log/cka-tests
-    type: DirectoryOrCreate
+
+# Only the tests contianer should have access to this volumes, but it fails if i remove it
 
 extraVolumeMounts:
   - name: tests-logs
-    mountPath: /var/log/cka-tests
+    mountPath: /var/log/cka-tests-white
   - name: test-scripts
     mountPath: /usr/local/bin/tests
+
 
 extraVolumes:
   - name: tests-logs
     hostPath:
-      path: /var/log/cka-tests
+      path: /var/log/cka-tests-white
       type: DirectoryOrCreate
   - name: test-scripts
     configMap:
-      name: white-black-tests
+      name: white-tests
       defaultMode: 0755
 
-extraContainers:
+sidecars:
   - name: tests
-    image: ubuntu:latest
-    command: ["/bin/bash", "-c", "/usr/local/bin/tests/run-tests.sh"]
+    image: debian:bookworm-slim
+    command: 
+      - "/bin/sh"
+      - "-c"
+      - |
+        until /usr/local/bin/tests/run-tests.sh; do
+          echo "Script failed, retrying in 5 seconds..."
+          sleep 5
+        done
     volumeMounts:
       - name: tests-logs
-        mountPath: /var/log/cka-tests
+        mountPath: /var/log/cka-tests-white
       - name: test-scripts
         mountPath: /usr/local/bin/tests
