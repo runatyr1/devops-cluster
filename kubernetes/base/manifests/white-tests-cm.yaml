@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: white-tests
+  namespace: white
+data:
+  run-tests.sh: |
+    #!/bin/bash
+    
+    # Define constants
+    COLOR="white"
+    LOG_DIR="/var/log/cka-tests-${COLOR}"
+    
+    # Create the log directory if it doesn't exist
+    mkdir -p "${LOG_DIR}"
+    
+    # Function to install dependencies with retry
+    install_deps() {
+      if ! (apt-get update && apt-get install -y strace curl); then
+        echo "Failed to install dependencies at $(date)" >> "${LOG_DIR}/install-error.log"
+        return 1
+      fi
+      return 0
+    }
+
+    # Keep trying to install dependencies until successful
+    until install_deps; do
+      sleep 5
+    done
+
+    while true; do
+      # Syscall tests
+      date >> "${LOG_DIR}/test-syscalls.log"
+      strace -c sleep 1 2>> "${LOG_DIR}/test-syscalls.log"
+      
+      # AppArmor tests
+      date >> "${LOG_DIR}/tests-apparmor.logs"
+      # Note: aa-status isn't available in Alpine by default
+      # Instead, we can check AppArmor status through proc
+      if [ -f /sys/kernel/security/apparmor/profiles ]; then
+        cat /sys/kernel/security/apparmor/profiles >> "${LOG_DIR}/tests-apparmor.logs"
+      else
+        echo "AppArmor not available" >> "${LOG_DIR}/tests-apparmor.logs"
+      fi
+          
+      # Inter-service tests
+      if hostname | grep -q white; then
+        curl http://black-service.black.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
+      else
+        curl http://white-service.white.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
+      fi
+      
+      sleep 5
+    done

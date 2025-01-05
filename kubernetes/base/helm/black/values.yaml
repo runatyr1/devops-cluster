@@ -1,0 +1,52 @@
+nameOverride: "black"
+fullnameOverride: "black"
+
+serviceAccount:
+  create: true
+  name: "black-sa"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: black.pietro.top
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Service override for internal testing, default is LoadBalancer
+service:
+  type: ClusterIP
+  ## @param service.ports.http Port for HTTP
+  ports:
+    http: 80
+    https: 443
+
+
+# Only the tests contianer should have access to this volumes, but it fails if i remove it
+extraVolumeMounts:
+  - name: tests-logs
+    mountPath: /var/log/cka-tests-black
+  - name: test-scripts
+    mountPath: /usr/local/bin/tests
+
+
+extraVolumes:
+  - name: tests-logs
+    hostPath:
+      path: /var/log/cka-tests-black
+      type: DirectoryOrCreate
+  - name: test-scripts
+    configMap:
+      name: black-tests
+      defaultMode: 0755
+
+sidecars:
+  - name: tests
+    image: debian:bookworm-slim
+    command: ["/bin/sh", "-c", "/usr/local/bin/tests/run-tests.sh"]
+    volumeMounts:
+      - name: tests-logs
+        mountPath: /var/log/cka-tests-black
+      - name: test-scripts
+        mountPath: /usr/local/bin/tests

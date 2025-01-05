@@ -1,0 +1,60 @@
+nameOverride: "white"
+fullnameOverride: "white"
+
+serviceAccount:
+  create: true
+  name: "white-sa"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: white.pietro.top
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Service override for internal testing, default is LoadBalancer
+service:
+  type: ClusterIP
+  ## @param service.ports.http Port for HTTP
+  ports:
+    http: 80
+    https: 443
+
+
+# Only the tests contianer should have access to this volumes, but it fails if i remove it
+
+extraVolumeMounts:
+  - name: tests-logs
+    mountPath: /var/log/cka-tests-white
+  - name: test-scripts
+    mountPath: /usr/local/bin/tests
+
+
+extraVolumes:
+  - name: tests-logs
+    hostPath:
+      path: /var/log/cka-tests-white
+      type: DirectoryOrCreate
+  - name: test-scripts
+    configMap:
+      name: white-tests
+      defaultMode: 0755
+
+sidecars:
+  - name: tests
+    image: debian:bookworm-slim
+    command: 
+      - "/bin/sh"
+      - "-c"
+      - |
+        until /usr/local/bin/tests/run-tests.sh; do
+          echo "Script failed, retrying in 5 seconds..."
+          sleep 5
+        done
+    volumeMounts:
+      - name: tests-logs
+        mountPath: /var/log/cka-tests-white
+      - name: test-scripts
+        mountPath: /usr/local/bin/tests
