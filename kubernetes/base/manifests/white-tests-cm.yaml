@@ -16,7 +16,7 @@ data:
     
     # Function to install dependencies with retry
     install_deps() {
-      if ! (apt-get update && apt-get install -y strace curl); then
+      if ! (apt-get update && apt-get install -y strace curl apparmor apparmor-utils); then
         echo "Failed to install dependencies at $(date)" >> "${LOG_DIR}/install-error.log"
         return 1
       fi
@@ -28,6 +28,17 @@ data:
       sleep 5
     done
 
+    # Function to enable AppArmor
+    enable_apparmor() {
+      if ! systemctl is-active apparmor >/dev/null 2>&1; then
+        systemctl enable apparmor
+        systemctl start apparmor
+      fi
+    }
+
+    # Try to enable AppArmor if it's not already running
+    enable_apparmor
+
     while true; do
       # Syscall tests
       date >> "${LOG_DIR}/test-syscalls.log"
@@ -35,19 +46,23 @@ data:
       
       # AppArmor tests
       date >> "${LOG_DIR}/tests-apparmor.logs"
-      # Note: aa-status isn't available in Alpine by default
-      # Instead, we can check AppArmor status through proc
-      if [ -f /sys/kernel/security/apparmor/profiles ]; then
-        cat /sys/kernel/security/apparmor/profiles >> "${LOG_DIR}/tests-apparmor.logs"
+      if aa-status >/dev/null 2>&1; then
+        aa-status >> "${LOG_DIR}/tests-apparmor.logs"
       else
-        echo "AppArmor not available" >> "${LOG_DIR}/tests-apparmor.logs"
+        echo "Attempting to enable AppArmor..." >> "${LOG_DIR}/tests-apparmor.logs"
+        enable_apparmor
+        if aa-status >/dev/null 2>&1; then
+          aa-status >> "${LOG_DIR}/tests-apparmor.logs"
+        else
+          echo "Failed to enable AppArmor - check kernel support" >> "${LOG_DIR}/tests-apparmor.logs"
+        fi
       fi
           
       # Inter-service tests
       if hostname | grep -q white; then
-        curl http://black-service.black.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
+        curl http://black.black.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
       else
-        curl http://white-service.white.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
+        curl http://white.white.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
       fi
       
       sleep 5
