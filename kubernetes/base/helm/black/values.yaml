@@ -14,22 +14,21 @@ ingress:
         - path: /
           pathType: Prefix
 
-# Service override for internal testing, default is LoadBalancer
 service:
   type: ClusterIP
-  ## @param service.ports.http Port for HTTP
   ports:
     http: 80
     https: 443
 
-
-# Only the tests contianer should have access to this volumes, but it fails if i remove it
 extraVolumeMounts:
   - name: tests-logs
     mountPath: /var/log/cka-tests-black
   - name: test-scripts
     mountPath: /usr/local/bin/tests
-
+  - name: security
+    mountPath: /sys/kernel/security
+  - name: cgroup
+    mountPath: /sys/fs/cgroup
 
 extraVolumes:
   - name: tests-logs
@@ -40,13 +39,38 @@ extraVolumes:
     configMap:
       name: black-tests
       defaultMode: 0755
+  - name: security
+    hostPath:
+      path: /sys/kernel/security
+      type: Directory
+  - name: cgroup
+    hostPath:
+      path: /sys/fs/cgroup
+      type: Directory
 
 sidecars:
   - name: tests
     image: debian:bookworm-slim
-    command: ["/bin/sh", "-c", "/usr/local/bin/tests/run-tests.sh"]
+    securityContext:
+      privileged: true
+      capabilities:
+        add:
+          - SYS_ADMIN
+          - MKNOD
+    command: 
+      - "/bin/sh"
+      - "-c"
+      - |
+        until /usr/local/bin/tests/run-tests.sh; do
+          echo "Script failed, retrying in 5 seconds..."
+          sleep 5
+        done
     volumeMounts:
       - name: tests-logs
         mountPath: /var/log/cka-tests-black
       - name: test-scripts
         mountPath: /usr/local/bin/tests
+      - name: security
+        mountPath: /sys/kernel/security
+      - name: cgroup
+        mountPath: /sys/fs/cgroup

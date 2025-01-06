@@ -16,7 +16,7 @@ data:
     
     # Function to install dependencies with retry
     install_deps() {
-      if ! (apt-get update && apt-get install -y strace curl); then
+      if ! (apt-get update && apt-get install -y strace curl apparmor apparmor-utils); then
         echo "Failed to install dependencies at $(date)" >> "${LOG_DIR}/install-error.log"
         return 1
       fi
@@ -28,6 +28,37 @@ data:
       sleep 5
     done
 
+    # Function to enable AppArmor
+    enable_apparmor() {
+      # First check if the module is loaded
+      if ! grep -q "Y" /sys/module/apparmor/parameters/enabled 2>/dev/null; then
+        echo "Loading AppArmor module..."
+        modprobe apparmor
+      fi
+
+      # Check if securityfs is mounted
+      if ! mount | grep -q 'securityfs'; then
+        echo "Mounting securityfs..."
+        mount -t securityfs securityfs /sys/kernel/security
+      fi
+
+      # Mount AppArmor filesystem if not already mounted
+      if ! mount | grep -q '/sys/kernel/security/apparmor'; then
+        echo "Mounting AppArmor filesystem..."
+        mount -t securityfs securityfs /sys/kernel/security
+        mkdir -p /sys/kernel/security/apparmor
+      fi
+
+      # Try to start AppArmor service if systemd is available
+      if command -v systemctl >/dev/null 2>&1; then
+        systemctl enable apparmor 2>/dev/null
+        systemctl start apparmor 2>/dev/null
+      fi
+    }
+
+    # Try to enable AppArmor if it's not already running
+    enable_apparmor
+
     while true; do
       # Syscall tests
       date >> "${LOG_DIR}/test-syscalls.log"
@@ -35,21 +66,25 @@ data:
       
       # AppArmor tests
       date >> "${LOG_DIR}/tests-apparmor.logs"
-      # Note: aa-status isn't available in Alpine by default
-      # Instead, we can check AppArmor status through proc
-      if [ -f /sys/kernel/security/apparmor/profiles ]; then
-        cat /sys/kernel/security/apparmor/profiles >> "${LOG_DIR}/tests-apparmor.logs"
-      else
-        echo "AppArmor not available" >> "${LOG_DIR}/tests-apparmor.logs"
-      fi
       
+      # Check AppArmor status comprehensively
+      apparmor_status >> "${LOG_DIR}/tests-apparmor.logs" 2>&1 || {
+        echo "Attempting to enable AppArmor..." >> "${LOG_DIR}/tests-apparmor.logs"
+        enable_apparmor
+        if apparmor_status >/dev/null 2>&1; then
+          apparmor_status >> "${LOG_DIR}/tests-apparmor.logs"
+        else
+          echo "AppArmor status: $(apparmor_status 2>&1)" >> "${LOG_DIR}/tests-apparmor.logs"
+          echo "Module status: $(cat /sys/module/apparmor/parameters/enabled 2>/dev/null)" >> "${LOG_DIR}/tests-apparmor.logs"
+          echo "Mount status: $(mount | grep apparmor)" >> "${LOG_DIR}/tests-apparmor.logs"
+        fi
+      }
+          
       # Inter-service tests
       if hostname | grep -q white; then
-          # If we're on white, curl black
-          curl http://black-service.black.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
+        curl http://black.black.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
       else
-          # If we're not on white, curl white
-          curl http://white-service.white.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
+        curl http://white.white.svc.cluster.local >> "${LOG_DIR}/test-curl.log" 2>&1
       fi
       
       sleep 5
