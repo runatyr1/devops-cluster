@@ -17,10 +17,13 @@
       service:
         name: containerd
         state: restarted
-
     - name: Reboot system
       reboot:
         reboot_timeout: 3600
+    - name: Restart sshd
+      service:
+        name: sshd
+        state: restarted
 
   tasks:
     - name: Configure kernel parameters for cgroups
@@ -293,7 +296,7 @@
         - { name: 'net.core.somaxconn', value: '32768' }
         - { name: 'net.ipv4.tcp_max_syn_backlog', value: '8096' }
         - { name: 'net.ipv4.tcp_tw_reuse', value: '1' }
-        
+    
     - name: Check if Kubernetes cluster exists
       stat:
         path: /etc/kubernetes/admin.conf
@@ -448,6 +451,53 @@
         port: 6443
         timeout: 300
       when: not k8s_config.stat.exists
+
+
+
+    # System hardening
+    - name: Configure additional security parameters
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+        sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+        sysctl_set: yes
+      loop:
+        - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+
+    - name: Configure SSH security settings
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        validate: '/usr/sbin/sshd -t -f %s'
+      loop:
+        - { regexp: '^#?ClientAliveInterval.*', line: 'ClientAliveInterval 300' }
+        - { regexp: '^#?ClientAliveCountMax.*', line: 'ClientAliveCountMax 2' }
+        - { regexp: '^#?MaxStartups.*', line: 'MaxStartups 10:30:60' }
+      notify: Restart sshd
+
+    - name: Ensure secure permissions on Kubernetes PKI
+      file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+        owner: root
+        group: root
+        state: directory
+      loop:
+        - { path: '/etc/kubernetes/pki', mode: '0700' }
+      when: k8s_config.stat.exists
+
+    - name: Ensure secure permissions on Kubernetes CA key
+      file:
+        path: /etc/kubernetes/pki/ca.key
+        mode: '0400'
+        owner: root
+        group: root
+      when: k8s_config.stat.exists
 
 
     - name: Add Cilium helm repository
