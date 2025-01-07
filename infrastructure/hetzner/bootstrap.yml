@@ -543,7 +543,54 @@
         - { port: 4244, proto: tcp, comment: "Cilium Hubble Server" }
         - { port: 8472, proto: udp, comment: "VXLAN overlay" }
     
-    
+    # Disable kernel modules that aren't needed
+    - name: Configure extended kernel module blacklist
+      copy:
+        dest: /etc/modprobe.d/kubernetes-blacklist.conf
+        content: |
+          # Hardware modules not needed in cloud VMs
+          blacklist pcspkr
+          blacklist thunderbolt
+          blacklist bluetooth
+          blacklist firewire-core
+          blacklist psmouse
+          blacklist joydev
+          blacklist serio_raw
+          blacklist cdrom
+          blacklist sr_mod
+          
+          # Power management modules not needed in cloud
+          blacklist intel_rapl_msr
+          blacklist intel_rapl_common
+          blacklist intel_uncore_frequency_common
+          blacklist rapl
+          
+          # Graphics-related modules not needed for headless operation
+          blacklist bochs
+          blacklist virtio_gpu
+          blacklist drm_vram_helper
+          blacklist drm
+          blacklist drm_kms_helper
+          
+          # Other unnecessary hardware
+          blacklist i2c_i801
+          blacklist lpc_ich
+        mode: '0644'
+      register: blacklist_conf
+
+    - name: Update initramfs after module blacklist
+      command: update-initramfs -u
+      when: blacklist_conf.changed
+
+    - name: Reboot if kernel module blacklist changed
+      reboot:
+        msg: "Rebooting due to kernel module blacklist changes"
+        reboot_timeout: 3600
+      when: blacklist_conf.changed
+
+
+
+
 
 
     # Cilium
