@@ -588,8 +588,22 @@
         reboot_timeout: 3600
       when: blacklist_conf.changed
 
-
-
+    - name: Remove unnecessary packages
+      apt:
+        name:
+          - at                 # Task scheduler - use systemd timers instead
+          - aptitude           # pkg manager not needed as we have apt
+          - aptitude-common    # pkg manager not needed as we have apt
+          - genisoimage        # ISO creation tool not needed on k8s node
+          - groff-base         # Documentation formatting
+          - man-db             # Man pages database
+          - manpages           # Manual pages
+          - inetutils-telnet   # Insecure telnet client
+        state: absent
+        purge: true
+        autoremove: true
+      become: true
+    
 
 
 
