@@ -24,6 +24,12 @@
       service:
         name: sshd
         state: restarted
+    - name: Reload UFW
+      ufw:
+        state: reloaded
+    - name: Save iptables
+      command: netfilter-persistent save
+      changed_when: true
 
   tasks:
     - name: Configure kernel parameters for cgroups
@@ -42,7 +48,7 @@
       reboot:
         reboot_timeout: 3600
       when: grub_updated.changed
-
+    
     - name: Install dependencies
       apt:
         name: 
@@ -51,9 +57,11 @@
           - curl
           - gnupg
           - lsb-release
+          - netfilter-persistent
+          - iptables-persistent
         state: present
         update_cache: yes
-
+   
     - name: Add Docker GPG key
       apt_key:
         url: https://download.docker.com/linux/debian/gpg
@@ -499,7 +507,46 @@
         group: root
       when: k8s_config.stat.exists
 
+    # Configure firewall
+    - name: Install UFW
+      apt:
+        name: ufw
+        state: present
+    
+    - name: Allow SSH first
+      ufw:
+        rule: allow
+        port: 22
+        proto: tcp
+        comment: "SSH access"
 
+    - name: Configure UFW defaults
+      ufw:
+        state: enabled
+        default: deny
+        direction: incoming
+        logging: on
+      notify: Reload UFW
+
+    - name: Configure remaining K8s UFW rules
+      ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+        comment: "{{ item.comment }}"
+      loop:
+        - { port: 6443, proto: tcp, comment: "Kubernetes API Server" }
+        - { port: 2379, proto: tcp, comment: "etcd client API" }
+        - { port: 2380, proto: tcp, comment: "etcd server API" }
+        - { port: 10250, proto: tcp, comment: "Kubelet API" }
+        - { port: 4240, proto: tcp, comment: "Cilium health checks" }
+        - { port: 4244, proto: tcp, comment: "Cilium Hubble Server" }
+        - { port: 8472, proto: udp, comment: "VXLAN overlay" }
+    
+    
+
+
+    # Cilium
     - name: Add Cilium helm repository
       kubernetes.core.helm_repository:
         name: cilium
