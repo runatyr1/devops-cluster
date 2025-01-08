@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: seccomp-demo
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: syscall-test-script
+  namespace: seccomp-demo
+data:
+  test.sh: |
+    #!/bin/bash
+    while true; do
+        # Test chmod syscall
+        if chmod 644 /tmp/test.txt 2>/dev/null; then
+            echo "[$(date)] chmod syscall succeeded"
+        else
+            echo "[$(date)] chmod syscall failed: $?"
+        fi
+
+        # Test file creation
+        if touch /tmp/test2.txt 2>/dev/null; then
+            echo "[$(date)] create/touch syscall succeeded"
+        else
+            echo "[$(date)] create/touch syscall failed: $?"
+        fi
+
+        # Test process creation
+        if ps aux >/dev/null 2>&1; then
+            echo "[$(date)] process listing syscall succeeded"
+        else
+            echo "[$(date)] process listing syscall failed: $?"
+        fi
+
+        sleep 5
+    done
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seccomp-demo-unrestricted
+  namespace: seccomp-demo
+spec:
+  containers:
+  - name: syscall-test
+    image: debian:bookworm-slim
+    command: ["/bin/bash"]
+    args: ["-c", "/scripts/test.sh"]
+    securityContext:
+      allowPrivilegeEscalation: false
+    volumeMounts:
+    - name: test-script
+      mountPath: /scripts
+  volumes:
+  - name: test-script
+    configMap:
+      name: syscall-test-script
+      defaultMode: 0777
+      items:
+        - key: test.sh
+          path: test.sh
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seccomp-demo-restricted
+  namespace: seccomp-demo
+spec:
+  securityContext:
+    seccompProfile:
+      type: Localhost
+      localhostProfile: profiles/custom-seccomp.json
+  containers:
+  - name: syscall-test
+    image: debian:bookworm-slim
+    command: ["/bin/bash"]
+    args: ["-c", "/scripts/test.sh"]
+    securityContext:
+      allowPrivilegeEscalation: false
+    volumeMounts:
+    - name: test-script
+      mountPath: /scripts
+  volumes:
+  - name: test-script
+    configMap:
+      name: syscall-test-script
+      defaultMode: 0777
+      items:
+        - key: test.sh
+          path: test.sh
