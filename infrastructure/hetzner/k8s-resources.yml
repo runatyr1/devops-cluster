@@ -194,16 +194,34 @@
       become: no
       register: k8s_files
 
-    - name: Apply K8s manifests
-      kubernetes.core.k8s:
-        state: present
-        src: "{{ item.path }}"
-        apply: yes
+    # Tried with apply --force and doesn't work for pods, using replace:    
+    - name: Apply all Kubernetes manifests with replace
+      ansible.builtin.shell: 
+        cmd: "kubectl replace --force -f {{ item.path }}"
       loop: "{{ k8s_files.files }}"
-      delegate_to: localhost  # Run this task on the local machine
+      delegate_to: localhost
       become: no
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
+      register: kubectl_apply_result
+      changed_when: "'configured' in kubectl_apply_result.stdout or 'created' in kubectl_apply_result.stdout"
+      ignore_errors: yes  # This will allow other files to be processed even if one fails
+        
+
+        
+    # This two step allows trying graceful apply or forcing if it failed
+#    - name: Force apply if previous attempt failed
+#      kubernetes.core.k8s:
+#        state: present
+#        src: "{{ item.item.path }}"
+#        apply: yes
+#        force: yes
+#        wait: yes
+#        wait_timeout: 60
+#      when: item is failed
+#      loop: "{{ apply_result.results }}"
+#      delegate_to: localhost
+#      become: no
+#      vars:
+#        ansible_python_interpreter: /usr/bin/python3
 
 # Adding repos disabled as we are using OCI registry, but it might be needed later 
 #    - name: Add Helm repositories

@@ -604,8 +604,28 @@
         autoremove: true
       become: true
     
+    # Check seccomp is supported and copy demo profile           
+    - name: Check kernel seccomp support
+      shell: "grep CONFIG_SECCOMP /boot/config-$(uname -r)"
+      register: seccomp_check
+      changed_when: false
+      failed_when: >
+        seccomp_check.rc != 0 or
+        'CONFIG_SECCOMP=y' not in seccomp_check.stdout or
+        'CONFIG_SECCOMP_FILTER=y' not in seccomp_check.stdout
+     
+    - name: Create seccomp profiles directory
+      file:
+        path: /var/lib/kubelet/seccomp/profiles
+        state: directory
+        mode: '0744'
 
-
+    - name: Copy seccomp profile
+      copy:
+        src: ../../scripts/tests/seccomp-demo-profile.json
+        dest: /var/lib/kubelet/seccomp/profiles/custom-seccomp.json
+        mode: '0644'
+    
 
     # Cilium
     - name: Add Cilium helm repository

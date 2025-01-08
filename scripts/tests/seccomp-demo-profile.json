@@ -1,0 +1,27 @@
+{
+    "defaultAction": "SCMP_ACT_LOG",
+    "architectures": [
+        "SCMP_ARCH_X86_64"
+    ],
+    "syscalls": [
+        {
+            "names": [
+                "close",
+                "exit",
+                "exit_group",
+                "rt_sigreturn",
+                "write",
+                "read"
+            ],
+            "action": "SCMP_ACT_ALLOW"
+        },
+        {
+            "names": [
+                "chmod",
+                "creat",
+                "open"
+            ],
+            "action": "SCMP_ACT_ERRNO"
+        }
+    ]
+}
