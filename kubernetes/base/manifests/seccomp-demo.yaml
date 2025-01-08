@@ -12,20 +12,25 @@ metadata:
 data:
   test.sh: |
     #!/bin/bash
+    # Install required packages
+    apt-get update
+    apt-get install -y procps
+
     while true; do
-        # Test chmod syscall
-        if chmod 644 /tmp/test.txt 2>/dev/null; then
+        # Test chmod syscall on /etc/hostname (always exists in containers)
+        if chmod 644 /etc/hostname 2>/dev/null; then
             echo "[$(date)] chmod syscall succeeded"
         else
             echo "[$(date)] chmod syscall failed: $?"
         fi
 
         # Test file creation
-        if touch /tmp/test2.txt 2>/dev/null; then
-            echo "[$(date)] create/touch syscall succeeded"
-        else
-            echo "[$(date)] create/touch syscall failed: $?"
-        fi
+        # Test disabled as it required restricting syscall openat which crashed the container
+        #if touch /tmp/test2.txt 2>/dev/null; then
+        #    echo "[$(date)] create/touch syscall succeeded"
+        #else
+        #    echo "[$(date)] create/touch syscall failed: $?"
+        #fi
 
         # Test process creation
         if ps aux >/dev/null 2>&1; then
@@ -36,7 +41,6 @@ data:
 
         sleep 5
     done
-
 ---
 apiVersion: v1
 kind: Pod

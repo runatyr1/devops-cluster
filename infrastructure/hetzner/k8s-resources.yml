@@ -194,7 +194,8 @@
       become: no
       register: k8s_files
 
-    # Tried with apply --force and doesn't work for pods, using replace:    
+    # Tried with apply --force and doesn't work for pods, using replace,
+    # which will DELETE and RECREATE all resources:    
     - name: Apply all Kubernetes manifests with replace
       ansible.builtin.shell: 
         cmd: "kubectl replace --force -f {{ item.path }}"
@@ -233,6 +234,9 @@
 #      delegate_to: localhost
 #      become: no
 
+    # This is not working fine to apply updates, only to create new deployment
+    # So to update it requires to manually delete
+    # Need to switch to a proper tool to sync the k8s config with the running cluster
     - name: Deploy Helm charts
       kubernetes.core.helm:
         name: "{{ item.name }}"

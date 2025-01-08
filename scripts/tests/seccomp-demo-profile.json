@@ -1,5 +1,5 @@
 {
-    "defaultAction": "SCMP_ACT_LOG",
+    "defaultAction": "SCMP_ACT_ALLOW",
     "architectures": [
         "SCMP_ARCH_X86_64"
     ],
@@ -18,7 +18,7 @@
         {
             "names": [
                 "chmod",
-                "creat",
+                "fchmodat",  
                 "open"
             ],
             "action": "SCMP_ACT_ERRNO"
