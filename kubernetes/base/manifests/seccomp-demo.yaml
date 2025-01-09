@@ -1,10 +1,4 @@
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: seccomp-demo
-
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: syscall-test-script

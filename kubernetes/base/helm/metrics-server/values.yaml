@@ -1,0 +1,20 @@
+metrics-server:
+  args:
+    - --kubelet-insecure-tls
+    - --kubelet-preferred-address-types=InternalIP
+
+  hostNetwork:
+    enabled: true
+
+  metrics:
+    enabled: true
+
+  serviceMonitor:
+    enabled: false  # Enable if using Prometheus later
+
+  resources:
+    limits:
+      memory: 300Mi
+    requests:
+      cpu: 100m
+      memory: 200Mi

@@ -22,6 +22,11 @@
         chart: "oci://registry-1.docker.io/bitnamicharts/nginx"
         repository: ""
         values_file: "{{ helm_charts_path }}/black/values.yaml"
+      - name: "metrics-server"
+        namespace: "kube-system"
+        chart: "oci://registry.k8s.io/metrics-server/metrics-server"
+        repository: "https://kubernetes-sigs.github.io/metrics-server/"
+        values_file: "{{ helm_charts_path }}/metrics-server/values.yaml"
   
   pre_tasks:
     # Check Kubernetes initialization
@@ -195,17 +200,17 @@
       register: k8s_files
 
     # Tried with apply --force and doesn't work for pods, using replace,
-    # which will DELETE and RECREATE all resources:    
+    # which will DELETE and RECREATE all resources, and apply for NEW resources:    
     - name: Apply all Kubernetes manifests with replace
-      ansible.builtin.shell: 
+      ansible.builtin.shell:
         cmd: "kubectl replace --force -f {{ item.path }}"
       loop: "{{ k8s_files.files }}"
       delegate_to: localhost
       become: no
-      register: kubectl_apply_result
-      changed_when: "'configured' in kubectl_apply_result.stdout or 'created' in kubectl_apply_result.stdout"
-      ignore_errors: yes  # This will allow other files to be processed even if one fails
-        
+      register: kubectl_replace_result
+      changed_when: "'replaced' in kubectl_replace_result.stdout or 'created' in kubectl_replace_result.stdout"
+      ignore_errors: yes
+             
 
         
     # This two step allows trying graceful apply or forcing if it failed
@@ -233,6 +238,7 @@
 #        - { name: nginx, url: https://nginx.github.io/helm-charts }
 #      delegate_to: localhost
 #      become: no
+
 
     # This is not working fine to apply updates, only to create new deployment
     # So to update it requires to manually delete
