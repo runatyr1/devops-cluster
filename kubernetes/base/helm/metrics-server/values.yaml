@@ -1,20 +1,40 @@
-metrics-server:
-  args:
-    - --kubelet-insecure-tls
-    - --kubelet-preferred-address-types=InternalIP
+containerPort: 10251 
 
-  hostNetwork:
-    enabled: true
+defaultArgs: []  # Clear defaults
+args:  # Define all args we want
+  - --cert-dir=/tmp
+  - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+  - --kubelet-use-node-status-port
+  - --metric-resolution=15s
+  - --kubelet-insecure-tls
 
-  metrics:
-    enabled: true
+hostNetwork:
+  enabled: true
 
-  serviceMonitor:
-    enabled: false  # Enable if using Prometheus later
+resources:
+  limits:
+    memory: 300Mi
+  requests:
+    cpu: 100m
+    memory: 200Mi
 
-  resources:
-    limits:
-      memory: 300Mi
-    requests:
-      cpu: 100m
-      memory: 200Mi
+
+livenessProbe:
+  httpGet:
+    path: /livez
+    port: 10251  # Match with secure-port
+    scheme: HTTPS
+  initialDelaySeconds: 30  # Increase from 0
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 10251  # Match with secure-port
+    scheme: HTTPS
+  initialDelaySeconds: 30  # Increase from 20
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3

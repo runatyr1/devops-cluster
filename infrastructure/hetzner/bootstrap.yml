@@ -347,7 +347,7 @@
       debug:
         var: etcd_status.stdout_lines
 
-# Doing manual image pull as hetzner sometimes fails
+    #  REPO CONTAINER FLOW (to fix hetzner can't reach k8s.io)
     - name: Prepare Kubernetes control plane images locally
       block:
         - name: Create local image download directory
