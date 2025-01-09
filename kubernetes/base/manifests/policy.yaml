@@ -1,0 +1,24 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: prevent-namespace-deletion
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      operations: ["DELETE"]
+      resources: ["namespaces"]
+  validations:
+    - expression: "false"
+      message: "Namespace deletion is not allowed"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: prevent-namespace-deletion-binding
+spec:
+  policyName: prevent-namespace-deletion
+  validationActions: [Deny]
+  matchResources: {}
