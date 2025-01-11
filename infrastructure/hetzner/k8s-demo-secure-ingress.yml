@@ -47,9 +47,9 @@
             tls.key: "{{ cert_files.results[1].content }}"
       delegate_to: localhost
 
-    - name: Add hosts entry
-      lineinfile:
+    - name: Add/Update hosts entry
+      replace:
         path: /etc/hosts
-        line: "{{ ansible_host }} example.com"
-        state: present
+        regexp: '.*example\.com.*'
+        replace: "{{ ansible_host }} example.com"
       delegate_to: localhost
