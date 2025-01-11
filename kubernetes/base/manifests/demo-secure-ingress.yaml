@@ -64,6 +64,7 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-passthrough: "false"  # Added to clarify TLS termination
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"  # Force HTTPS
 spec:
+  ingressClassName: nginx 
   tls:
   - hosts:
     - example.com
