@@ -1,0 +1,7 @@
+apiVersion: v2
+name: white
+version: 1.0.0
+dependencies:
+  - name: nginx
+    version: "^15.0.0"  # Use latest stable 15.x version
+    repository: https://charts.bitnami.com/bitnami
