@@ -1,0 +1,55 @@
+- hosts: all
+  become: yes
+  vars_files:
+    - secret_vars.yml
+  vars:
+    docker_images_path: "../../kubernetes/dockerfiles"
+    k8s_manifests_path: "../../kubernetes/base/manifests"
+    helm_charts_path: "../../kubernetes/base/helm" 
+    registry_name: "local-registry"
+    registry_port: "5000"
+    ansible_become_pass: "{{ ansible_become_pass }}"
+  
+  
+  tasks:
+    - name: Generate self-signed certificate
+      command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout /tmp/tls.key
+        -out /tmp/tls.crt
+        -subj "/CN=example.com"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Read certificate files
+      slurp:
+        src: "{{ item }}"
+      register: cert_files
+      loop:
+        - /tmp/tls.crt
+        - /tmp/tls.key
+      delegate_to: localhost
+      run_once: true
+
+    - name: Update TLS secret with certificate data
+      kubernetes.core.k8s:
+        kubeconfig: ~/.kube/config
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: nginx-tls-secret
+            namespace: default
+          type: kubernetes.io/tls
+          data:
+            tls.crt: "{{ cert_files.results[0].content }}"
+            tls.key: "{{ cert_files.results[1].content }}"
+      delegate_to: localhost
+
+    - name: Add hosts entry
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_host }} example.com"
+        state: present
+      delegate_to: localhost

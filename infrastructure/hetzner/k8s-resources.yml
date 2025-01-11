@@ -27,6 +27,12 @@
         chart: "metrics-server/metrics-server"
         repository: "metrics-server"
         values_file: "{{ helm_charts_path }}/metrics-server/values.yaml"
+      - name: "ingress-nginx"
+        namespace: "ingress-nginx"
+        chart: "ingress-nginx/ingress-nginx"
+        repository: "https://kubernetes.github.io/ingress-nginx"
+        create_namespace: true
+        values_file: "{{ helm_charts_path }}/ingress-nginx/values.yaml"
   
   pre_tasks:
     # Check Kubernetes initialization
@@ -199,25 +205,30 @@
         
         images=(
           "registry.k8s.io/metrics-server/metrics-server:v0.7.2"
+          "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.5.0"
         )
         
         for image in "${images[@]}"; do
-          # Pull the image
-          ctr -n=k8s.io image pull "$image"
+          # Pull with platform spec
+          ctr -n=k8s.io image pull --platform linux/amd64 "$image"
           
-          # Save the image
-          filename="/tmp/k8s-images/$(echo "$image" | tr '/:' '_').tar"
+          # Tag with digest if webhook certgen
+          if [[ $image == *"webhook-certgen"* ]]; then
+            ctr -n=k8s.io images tag "$image" "$image@sha256:aaafd456bda110628b2d4ca6296f38731a3aaf0bf7581efae824a41c770a8fc4"
+          fi
+          
+          # Export
+          filename="/tmp/k8s-images/$(echo "$image" | tr '/:@' '_').tar"
           ctr -n=k8s.io image export "$filename" "$image"
         done
         
-        # List the saved images
         ls -l /tmp/k8s-images/
       args:
         executable: /bin/bash
       delegate_to: localhost
-      register: image_pull_result
+      register: image_pull_result 
       changed_when: false
-
+ 
     - name: Find downloaded image files
       find:
         paths: /tmp/k8s-images
@@ -311,6 +322,8 @@
       loop:
         - name: metrics-server
           url: "https://kubernetes-sigs.github.io/metrics-server/"
+        - name: ingress-nginx
+          url: "https://kubernetes.github.io/ingress-nginx"
       delegate_to: localhost
       become: no
 
