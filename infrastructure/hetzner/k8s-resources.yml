@@ -188,82 +188,82 @@
       become: yes
       changed_when: false
 
-
-    #  REPO CONTAINER FLOW (to fix hetzner can't reach k8s.io)
-    - name: Prepare Kubernetes images locally
-      block:
-        - name: Create local image download directory
-          file:
-            path: /tmp/k8s-images
-            state: directory
-          delegate_to: localhost
-
-    - name: Pull and save Kubernetes images locally
-      shell: |
-        #!/bin/bash
-        set -e
-        
-        images=(
-          "registry.k8s.io/metrics-server/metrics-server:v0.7.2"
-          "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.5.0"
-        )
-        
-        for image in "${images[@]}"; do
-          # Pull with platform spec
-          ctr -n=k8s.io image pull --platform linux/amd64 "$image"
-          
-          # Tag with digest if webhook certgen
-          if [[ $image == *"webhook-certgen"* ]]; then
-            ctr -n=k8s.io images tag "$image" "$image@sha256:aaafd456bda110628b2d4ca6296f38731a3aaf0bf7581efae824a41c770a8fc4"
-          fi
-          
-          # Export
-          filename="/tmp/k8s-images/$(echo "$image" | tr '/:@' '_').tar"
-          ctr -n=k8s.io image export "$filename" "$image"
-        done
-        
-        ls -l /tmp/k8s-images/
-      args:
-        executable: /bin/bash
-      delegate_to: localhost
-      register: image_pull_result 
-      changed_when: false
- 
-    - name: Find downloaded image files
-      find:
-        paths: /tmp/k8s-images
-        patterns: '*.tar'
-      delegate_to: localhost
-      register: image_files
-
-    - name: Ensure images directory exists on remote
-      file:
-        path: /tmp/k8s-images
-        state: directory
-
-    - name: Copy images to remote server
-      copy:
-        src: "{{ item.path }}"
-        dest: "/tmp/k8s-images/{{ item.path | basename }}"
-      loop: "{{ image_files.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
-
-    - name: Load images on remote server
-      shell: |
-        for image_file in /tmp/k8s-images/*.tar; do
-          ctr -n=k8s.io image import "$image_file"
-        done
-      args:
-        executable: /bin/bash
-
-    - name: Clean up local image files
-      file:
-        path: /tmp/k8s-images
-        state: absent
-      delegate_to: localhost
-
-
+#
+#    #  REPO CONTAINER FLOW (to fix hetzner can't reach k8s.io)
+#    - name: Prepare Kubernetes images locally
+#      block:
+#        - name: Create local image download directory
+#          file:
+#            path: /tmp/k8s-images
+#            state: directory
+#          delegate_to: localhost
+#
+#    - name: Pull and save Kubernetes images locally
+#      shell: |
+#        #!/bin/bash
+#        set -e
+#        
+#        images=(
+#          "registry.k8s.io/metrics-server/metrics-server:v0.7.2"
+#          "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.5.0"
+#        )
+#        
+#        for image in "${images[@]}"; do
+#          # Pull with platform spec
+#          ctr -n=k8s.io image pull --platform linux/amd64 "$image"
+#          
+#          # Tag with digest if webhook certgen
+#          if [[ $image == *"webhook-certgen"* ]]; then
+#            ctr -n=k8s.io images tag "$image" "$image@sha256:aaafd456bda110628b2d4ca6296f38731a3aaf0bf7581efae824a41c770a8fc4"
+#          fi
+#          
+#          # Export
+#          filename="/tmp/k8s-images/$(echo "$image" | tr '/:@' '_').tar"
+#          ctr -n=k8s.io image export "$filename" "$image"
+#        done
+#        
+#        ls -l /tmp/k8s-images/
+#      args:
+#        executable: /bin/bash
+#      delegate_to: localhost
+#      register: image_pull_result 
+#      changed_when: false
+# 
+#    - name: Find downloaded image files
+#      find:
+#        paths: /tmp/k8s-images
+#        patterns: '*.tar'
+#      delegate_to: localhost
+#      register: image_files
+#
+#    - name: Ensure images directory exists on remote
+#      file:
+#        path: /tmp/k8s-images
+#        state: directory
+#
+#    - name: Copy images to remote server
+#      copy:
+#        src: "{{ item.path }}"
+#        dest: "/tmp/k8s-images/{{ item.path | basename }}"
+#      loop: "{{ image_files.files }}"
+#      loop_control:
+#        label: "{{ item.path | basename }}"
+#
+#    - name: Load images on remote server
+#      shell: |
+#        for image_file in /tmp/k8s-images/*.tar; do
+#          ctr -n=k8s.io image import "$image_file"
+#        done
+#      args:
+#        executable: /bin/bash
+#
+#    - name: Clean up local image files
+#      file:
+#        path: /tmp/k8s-images
+#        state: absent
+#      delegate_to: localhost
+#
+#
 
 
 
@@ -286,17 +286,27 @@
 
     # Tried with apply --force and doesn't work for pods, using replace,
     # which will DELETE and RECREATE all resources, and apply for NEW resources:    
-    - name: Apply all Kubernetes manifests with replace
+    - name: Apply namespace manifests first
       ansible.builtin.shell:
         cmd: "kubectl replace --force -f {{ item.path }}"
-      loop: "{{ k8s_files.files }}"
+      loop: "{{ k8s_files.files | selectattr('path', 'match', '.*/namespace_.*') | list }}"
       delegate_to: localhost
       become: no
       register: kubectl_replace_result
       changed_when: "'replaced' in kubectl_replace_result.stdout or 'created' in kubectl_replace_result.stdout"
       ignore_errors: yes
-             
-
+    
+    - name: Apply remaining manifests
+      ansible.builtin.shell:
+        cmd: "kubectl replace --force -f {{ item.path }}"
+      loop: "{{ k8s_files.files | rejectattr('path', 'match', '.*/namespace_.*') | list }}"
+      delegate_to: localhost
+      become: no
+      register: kubectl_replace_result
+      changed_when: "'replaced' in kubectl_replace_result.stdout or 'created' in kubectl_replace_result.stdout"
+      ignore_errors: yes
+                      
+     
         
     # This two step allows trying graceful apply or forcing if it failed
 #    - name: Force apply if previous attempt failed
