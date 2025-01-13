@@ -1,0 +1,80 @@
+# File: kubernetes/base/manifests/secure-ingress.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-letsencrypt-staging
+  labels:
+    app: demo-letsencrypt-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-letsencrypt-staging
+  template:
+    metadata:
+      labels:
+        app: demo-letsencrypt-staging
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: index-html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: index-html
+        configMap:
+          name: demo-letsencrypt-staging-cm
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-letsencrypt-staging
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: demo-letsencrypt-staging
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-letsencrypt-staging-cm
+data:
+  index.html: |
+    This is let's encrypt staging demo page
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-letsencrypt-staging
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    #nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    #nginx.ingress.kubernetes.io/ssl-passthrough: "false"
+    #nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - pietro.top
+    secretName: example-tls
+  rules:
+  - host: pietro.top
+    http:
+      paths:
+      - path: /letsencryptstaging
+        pathType: Prefix
+        backend:
+          service:
+            name: demo-letsencrypt-staging
+            port:
+              number: 80

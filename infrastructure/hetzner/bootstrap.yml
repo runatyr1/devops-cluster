@@ -542,7 +542,10 @@
         - { port: 4240, proto: tcp, comment: "Cilium health checks" }
         - { port: 4244, proto: tcp, comment: "Cilium Hubble Server" }
         - { port: 8472, proto: udp, comment: "VXLAN overlay" }
-    
+        - { port: 30080, proto: tcp, comment: "Ingress HTTP NodePort" }
+        - { port: 30443, proto: tcp, comment: "Ingress HTTPS NodePort" }
+        - { port: 80, proto: tcp, comment: "HTTP (for cert-manager validation)" }
+     
     # Disable kernel modules that aren't needed
     - name: Configure extended kernel module blacklist
       copy:

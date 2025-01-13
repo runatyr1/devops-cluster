@@ -1,0 +1,11 @@
+# File: kubernetes/base/helm/cert-manager/Chart.yaml
+apiVersion: v2
+name: cert-manager
+version: 1.0.0
+dependencies:
+  - name: cert-manager
+    version: v1.14.2
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled
+    tags:
+      - cert-manager
