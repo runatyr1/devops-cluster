@@ -33,6 +33,13 @@
         repository: "https://kubernetes.github.io/ingress-nginx"
         create_namespace: true
         values_file: "{{ helm_charts_path }}/ingress-nginx/values.yaml"
+      - name: "cert-manager"
+        namespace: "cert-manager"
+        chart: "jetstack/cert-manager"
+        version: "v1.16.2"
+        repository: "https://charts.jetstack.io"
+        create_namespace: true
+        values_file: "{{ helm_charts_path }}/cert-manager/values.yaml"
   
   pre_tasks:
     # Check Kubernetes initialization
@@ -334,9 +341,10 @@
           url: "https://kubernetes-sigs.github.io/metrics-server/"
         - name: ingress-nginx
           url: "https://kubernetes.github.io/ingress-nginx"
+        - name: jetstack
+          url: "https://charts.jetstack.io"
       delegate_to: localhost
       become: no
-
 
     # This is not working fine to apply updates, only to create new deployment
     # So to update it requires to manually delete
