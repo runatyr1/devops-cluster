@@ -1,6 +1,6 @@
 controller:
-  service:
-    type: NodePort
+  service: # This NodePort service is for the demo-ingress-selfsigned-cert.yaml
+    type: NodePort  # Also have a separate service for the LB: klipper-lb-ingress-nginx.yaml
     nodePorts:
       http: 30080
       https: 30443
