@@ -58,7 +58,8 @@ metadata:
   name: demo-letsencrypt-staging
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-staging"
-    #nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     #nginx.ingress.kubernetes.io/ssl-passthrough: "false"
     #nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:

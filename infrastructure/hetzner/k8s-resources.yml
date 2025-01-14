@@ -40,6 +40,12 @@
         repository: "https://charts.jetstack.io"
         create_namespace: true
         values_file: "{{ helm_charts_path }}/cert-manager/values.yaml"
+      - name: "metallb"
+        namespace: "metallb-system"
+        chart: "oci://registry-1.docker.io/bitnamicharts/metallb"
+        repository: ""
+        create_namespace: true
+        values_file: "{{ helm_charts_path }}/metal-lb/values.yaml"
   
   pre_tasks:
     # Check Kubernetes initialization
@@ -197,6 +203,7 @@
 
 #
 #    #  REPO CONTAINER FLOW (to fix hetzner can't reach k8s.io)
+#    #  Disabled as fixed by recreating node in other data center
 #    - name: Prepare Kubernetes images locally
 #      block:
 #        - name: Create local image download directory
@@ -273,6 +280,48 @@
 #
 
 
+  # Some charts use repos, some oci registry with the chart directly
+  # Running helm first, then other k8s configs that may depend on helm installs
+    - name: Add Helm repositories
+      kubernetes.core.helm_repository:
+        name: "{{ item.name }}"
+        repo_url: "{{ item.url }}"
+      loop:
+        - name: metrics-server
+          url: "https://kubernetes-sigs.github.io/metrics-server/"
+        - name: ingress-nginx
+          url: "https://kubernetes.github.io/ingress-nginx"
+        - name: jetstack
+          url: "https://charts.jetstack.io"
+      delegate_to: localhost
+      become: no
+
+    # This is not working fine to apply updates, only to create new deployment
+    # So to update it requires to manually delete
+    # Need to switch to a proper tool to sync the k8s config with the running cluster
+    - name: Deploy Helm charts
+      block:
+        - name: Deploy Helm charts
+          kubernetes.core.helm:
+            name: "{{ item.name }}"
+            chart_ref: "{{ item.chart }}"
+            release_namespace: "{{ item.namespace }}"
+            create_namespace: true
+            values_files:
+              - "{{ item.values_file }}"
+            wait: true
+            wait_timeout: "300s"
+            force: false
+          loop: "{{ helm_deployments }}"
+          delegate_to: localhost
+          become: no
+      rescue:
+        - name: Handle Helm chart deployment failure
+          debug:
+            msg: "Failed to deploy Helm chart '{{ item.name }}'. Continuing with the next tasks."
+          loop: "{{ helm_deployments }}"
+          delegate_to: localhost
+          become: no
 
     # Created needed dirs in host:
     - name: Create CIS reports directory
@@ -331,35 +380,3 @@
 #      vars:
 #        ansible_python_interpreter: /usr/bin/python3
 
-  #Adding repos disabled as we are using OCI registry, but it might be needed later 
-    - name: Add Helm repositories
-      kubernetes.core.helm_repository:
-        name: "{{ item.name }}"
-        repo_url: "{{ item.url }}"
-      loop:
-        - name: metrics-server
-          url: "https://kubernetes-sigs.github.io/metrics-server/"
-        - name: ingress-nginx
-          url: "https://kubernetes.github.io/ingress-nginx"
-        - name: jetstack
-          url: "https://charts.jetstack.io"
-      delegate_to: localhost
-      become: no
-
-    # This is not working fine to apply updates, only to create new deployment
-    # So to update it requires to manually delete
-    # Need to switch to a proper tool to sync the k8s config with the running cluster
-    - name: Deploy Helm charts
-      kubernetes.core.helm:
-        name: "{{ item.name }}"
-        chart_ref: "{{ item.chart }}"
-        release_namespace: "{{ item.namespace }}"
-        create_namespace: true
-        values_files: 
-          - "{{ item.values_file }}"
-        wait: true
-        wait_timeout: "300s"  # Changed from 300 to "300s"
-        force: false
-      loop: "{{ helm_deployments }}"
-      delegate_to: localhost
-      become: no
