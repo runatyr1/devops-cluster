@@ -464,17 +464,23 @@
     # Adding config update to enable alpha MutatingAdmissionPolicy
     # Should add/update kube-apiserver --runtime-config= in kube-apiserver
     - name: Update Kubernetes API Server param  --runtime-config= 
-      script: "{{ scripts_path }}/bootstrap/bootstrap-k8s-api-group-runtime-config.sh"
+      script: "{{ scripts_path }}/bootstrap/k8s-api-group-runtime-config.sh"
       become: yes
       register: runtime_config_update
       changed_when: runtime_config_update.stdout != "Target config already exists"
 
-
     - name: Update Kubernetes API Server param  --enable-admission-plugins 
-      script: "{{ scripts_path }}/bootstrap/bootstrap-k8s-enable-admission-plugins.sh"
+      script: "{{ scripts_path }}/bootstrap/k8s-enable-admission-plugins.sh"
       become: yes
       register: runtime_config_update2
       changed_when: runtime_config_update2.stdout != "Target config already exists"
+
+    - name: Enable Kubernetes audit policy logging
+      script: "{{ scripts_path }}/bootstrap/k8s-enable-audit-logging.sh"
+      become: yes
+      register: audit_policy_result
+      changed_when: audit_policy_result.stdout != "Target config already exists"
+
 
 
     # System hardening
@@ -683,6 +689,8 @@
           - ipvsadm
           - jq
           - nfs-common
+          - htop
+          - btop
         state: present
 
     - name: Check control-plane taint
