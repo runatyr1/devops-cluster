@@ -1,0 +1,8 @@
+# Requires separate yaml file for ansible kubecl replace, it uses a 
+# validating admission controller to prevent namespace recreate
+# from deleting all resources. This is a workaround due to ansible 
+# limitation to handle k8s syncs
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
