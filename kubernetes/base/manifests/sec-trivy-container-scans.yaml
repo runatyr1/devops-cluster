@@ -1,0 +1,118 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trivy-cluster-scan
+  namespace: security
+spec:
+  schedule: "0 1 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: trivy-scanner
+          initContainers:
+          - name: image-lister
+            image: debian:bookworm-slim
+            command:
+            - /bin/sh
+            - -c
+            args:
+            - |
+              # Install required packages
+              apt-get update && apt-get install -y curl jq
+              
+              # Get API server details
+              APISERVER="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT"
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              
+              # Get all images and save to shared volume
+              curl --cacert $CACERT --header "Authorization: Bearer $TOKEN" \
+                -X GET $APISERVER/api/v1/pods --silent | \
+                jq -r '.items[].spec.containers[].image' | sort -u > /workspace/images.txt
+            volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          containers:
+          - name: trivy-scanner
+            image: bitnami/trivy:latest
+            securityContext:
+              runAsUser: 0
+              runAsGroup: 0
+            command:
+            - /bin/sh
+            - -c
+            args:
+            - |
+              # Read images from shared volume
+              IMAGES=$(cat /workspace/images.txt)
+              
+              # Create output filename with timestamp
+              OUTPUT_FILE="/scans/$(date +%Y-%m-%d-%H-%M)-trivy-scan.json"
+              
+              # Initialize JSON array
+              echo '[' > "$OUTPUT_FILE"
+              
+              # Scan each image
+              FIRST=true
+              for IMAGE in $IMAGES; do
+                if [ "$FIRST" = true ]; then
+                  FIRST=false
+                else
+                  echo ',' >> "$OUTPUT_FILE"
+                fi
+                
+                # Run Trivy scan and append to file
+                ESCAPED_IMAGE=$(echo "$IMAGE" | sed 's/[\/&]/\\&/g')
+                trivy image --quiet --format json "$IMAGE" | sed "1s/^/{\"image\":\"${ESCAPED_IMAGE}\",\"scan_results\":/" | sed '$ s/$/}/' >> "$OUTPUT_FILE"
+              done
+              
+              # Close JSON array
+              echo ']' >> "$OUTPUT_FILE"
+              
+              # Clean up old files (keep last 30)
+              cd /scans && ls -t | tail -n +31 | xargs -r rm --
+            volumeMounts:
+            - name: scan-results
+              mountPath: /scans
+            - name: workspace
+              mountPath: /workspace
+          restartPolicy: OnFailure
+          volumes:
+          - name: scan-results
+            hostPath:
+              path: /var/log/trivy-container-scans
+              type: DirectoryOrCreate
+          - name: workspace
+            emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trivy-scanner
+  namespace: security
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-image-viewer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: trivy-scanner-binding
+subjects:
+- kind: ServiceAccount
+  name: trivy-scanner
+  namespace: security
+roleRef:
+  kind: ClusterRole
+  name: pod-image-viewer
+  apiGroup: rbac.authorization.k8s.io

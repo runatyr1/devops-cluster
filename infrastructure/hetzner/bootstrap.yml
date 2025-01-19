@@ -421,7 +421,7 @@
       delegate_to: localhost
 
 
-   # Initialize Kubernetes 
+   # Initialize Kubernetes control plane
 
     - name: Initialize Kubernetes cluster
       command: >
@@ -461,8 +461,7 @@
         timeout: 300
       when: not k8s_config.stat.exists
 
-    # Adding config update to enable alpha MutatingAdmissionPolicy
-    # Should add/update kube-apiserver --runtime-config= in kube-apiserver
+    # Kubernetes control plane custom parameters
     - name: Update Kubernetes API Server param  --runtime-config= 
       script: "{{ scripts_path }}/bootstrap/k8s-api-group-runtime-config.sh"
       become: yes
