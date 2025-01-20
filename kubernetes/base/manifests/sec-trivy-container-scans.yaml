@@ -75,6 +75,8 @@ spec:
               
               # Clean up old files (keep last 10)
               cd /scans && ls -t | tail -n +11 | xargs -r rm --
+
+
             volumeMounts:
             - name: scan-results
               mountPath: /scans
