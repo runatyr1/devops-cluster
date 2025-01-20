@@ -9,29 +9,23 @@ AUDIT_LOGS_DIR="/etc/kubernetes/audit-logs"
 
 # Create required directories
 mkdir -p "${AUDIT_POLICY_DIR}" "${AUDIT_LOGS_DIR}"
+chmod 700 "${AUDIT_POLICY_DIR}"
 
 # Function to check if audit policy exists and is correct
 setup_audit_policy() {
-    if [[ -f "${AUDIT_POLICY_FILE}" ]]; then
-        local current_policy=$(cat "${AUDIT_POLICY_FILE}")
-        local required_policy="apiVersion: audit.k8s.io/v1
+    # Create the policy file fresh each time
+    cat > "${AUDIT_POLICY_FILE}" <<EOF
+apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
 - level: Metadata
   resources:
-  - group: \"\"
-    resources: [\"secrets\"]
+  - group: ''
+    resources: ['secrets']
 - level: RequestResponse
-  userGroups: [\"system:nodes\"]
-- level: None"
-        
-        if [[ "${current_policy}" == "${required_policy}" ]]; then
-            echo "Audit policy already correctly configured"
-            return 0
-        fi
-    fi
-    
-    echo "${required_policy}" > "${AUDIT_POLICY_FILE}"
+  userGroups: ['system:nodes']
+- level: None
+EOF
     echo "Audit policy created/updated"
 }
 

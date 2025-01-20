@@ -73,8 +73,10 @@ spec:
               # Close JSON array
               echo ']' >> "$OUTPUT_FILE"
               
-              # Clean up old files (keep last 30)
-              cd /scans && ls -t | tail -n +31 | xargs -r rm --
+              # Clean up old files (keep last 10)
+              cd /scans && ls -t | tail -n +11 | xargs -r rm --
+
+
             volumeMounts:
             - name: scan-results
               mountPath: /scans
