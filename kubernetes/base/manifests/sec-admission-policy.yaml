@@ -1,0 +1,71 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: prevent-namespace-deletion
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      operations: ["DELETE"]
+      resources: ["namespaces"]
+  validations:
+    - expression: "false"
+      message: "Namespace deletion is not allowed"
+---
+
+## This is not working yet, even with v1alpha1 enabled and MutatingAdmissionPolicy enabled explicitly
+## But it causes not harm, so leaving for now as a possible implementation in the future
+## It ensures ingressClassName is set as nginx (but not working yet)
+
+apiVersion: admissionregistration.k8s.io/v1alpha1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: default-nginx-ingressclass
+spec:
+  # Required field, explicitly set to Fail (default) to handle any CEL expression errors or invalid configurations
+  failurePolicy: Fail
+  
+  # Required field per description: "Required."
+  # Using IfNeeded since we might need reinvocation if other admission plugins modify the object
+  reinvocationPolicy: IfNeeded
+  
+  matchConstraints:
+    # matchPolicy could be added here to specify how the rules are evaluated
+    resourceRules:
+    - apiGroups: ["networking.k8s.io"]
+      apiVersions: ["v1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["ingresses"]
+  
+  matchConditions:
+    - name: check-ingress-class
+      expression: |
+        !has(object.spec.ingressClassName) || 
+        object.spec.ingressClassName == '' || 
+        object.spec.ingressClassName != 'nginx'
+  
+  # mutations with required fields explicitly noted
+  mutations:
+    - patchType: "JSONPatch"  # Required field per description
+      jsonPatch:
+        expression: |
+          [
+            JSONPatch{
+              op: has(object.spec.ingressClassName) ? "replace" : "add",
+              path: "/spec/ingressClassName",
+              value: "nginx"
+            }
+          ]
+---
+apiVersion: admissionregistration.k8s.io/v1alpha1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: default-nginx-ingressclass-binding
+spec:
+  policyName: default-nginx-ingressclass
+  matchResources:
+    matchPolicy: Equivalent
+    namespaceSelector: {}
+    objectSelector: {}
