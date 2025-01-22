@@ -4,7 +4,7 @@
 set -x  # Enable command tracing
 
 MANIFEST_FILE="/etc/kubernetes/manifests/kube-apiserver.yaml"
-TARGET_PLUGIN="MutatingAdmissionPolicy"
+TARGET_PLUGIN="MutatingAdmissionPolicy,ImagePolicyWebhook"
 BACKUP_FILE="/root/kube-apiserver.yaml.bak"
 
 echo "Starting script..."
