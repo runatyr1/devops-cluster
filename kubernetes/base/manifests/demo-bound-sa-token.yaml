@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: restricted-sa
+  namespace: restricted-sa
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-pod
+  namespace: restricted-sa
+spec:
+  serviceAccountName: restricted-sa
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: caddy
+    image: caddy:2-alpine
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+        add: ["NET_BIND_SERVICE"]
+      runAsUser: 65532
+      runAsNonRoot: true
+    volumeMounts:
+    - name: data
+      mountPath: /data
+    - name: config
+      mountPath: /config
+    - name: sa-token-vol
+      mountPath: /var/run/secrets/tokens
+  automountServiceAccountToken: false
+  volumes:
+  - name: data
+    emptyDir: {}
+  - name: config
+    emptyDir: {}
+  - name: sa-token-vol
+    projected:
+      sources:
+      - serviceAccountToken:
+          audience: "secure-service"
+          expirationSeconds: 3600
+          path: token
