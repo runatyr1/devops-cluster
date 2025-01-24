@@ -143,7 +143,7 @@
   
   tasks:
 
-    # CUSTOM CONTAINER FLOW:
+    # CUSTOM CONTAINER FLOW - BUILD CUSTOM IMAGES:
     # Always rebuilds all images, I've tried tracking file content, it's cumbersome
     # Probably would need other method than ansible
     - name: Find all Dockerfiles
@@ -202,8 +202,8 @@
       changed_when: false
 
 #
-#    #  REPO CONTAINER FLOW (to fix hetzner can't reach k8s.io)
-#    #  Disabled as fixed by recreating node in other data center
+#    #  REPO CONTAINER FLOW: Upload public images manually to server
+#    # (to fix hetzner can't reach k8s.io) - Disabled as fixed by recreating node in other data center
 #    - name: Prepare Kubernetes images locally
 #      block:
 #        - name: Create local image download directory
