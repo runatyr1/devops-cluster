@@ -1,0 +1,25 @@
+apiVersion: node.k8s.io/v1 #This is also added in other file, but adding here again to prevent dependency failure
+kind: RuntimeClass
+metadata:
+  name: gvisor 
+handler: runsc
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: demo-gvisor-pod
+  name: demo-gvisor-pod
+spec:
+  containers:
+  - image: caddy:2-alpine #localhost:5000/demo-custom-caddy-secure:latest
+    imagePullPolicy: Never 
+    name: caddy
+    ports:
+    - containerPort: 80
+    resources: {}
+  dnsPolicy: ClusterFirst
+  runtimeClassName: gvisor
+  restartPolicy: Always
+status: {}

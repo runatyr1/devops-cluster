@@ -4,7 +4,8 @@
 set -x  # Enable command tracing
 
 MANIFEST_FILE="/etc/kubernetes/manifests/kube-apiserver.yaml"
-TARGET_PLUGIN="MutatingAdmissionPolicy,ImagePolicyWebhook"
+#This is not working to add more than one param yet, see https://github.com/runatyr1/devops-cluster/issues/52
+TARGET_PLUGIN="MutatingAdmissionPolicy" 
 BACKUP_FILE="/root/kube-apiserver.yaml.bak"
 
 echo "Starting script..."
