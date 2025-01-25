@@ -13,7 +13,7 @@ metadata:
   name: demo-gvisor-pod
 spec:
   containers:
-  - image: caddy:2-alpine #localhost:5000/demo-custom-caddy-secure:latest
+  - image: localhost:5000/demo-custom-caddy-secure:latest #caddy:2-alpine
     imagePullPolicy: Never 
     name: caddy
     ports:
