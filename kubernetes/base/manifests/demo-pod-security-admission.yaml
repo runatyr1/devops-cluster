@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-audit-baseline
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-audit-restricted
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-audit-privileged
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-warn-baseline
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-warn-restricted
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-warn-privileged
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-enforce-baseline
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: psa-enforce-privileged
+spec:
+  containers:
+  - name: nginx
+    image: nginxinc/nginx-unprivileged:latest
