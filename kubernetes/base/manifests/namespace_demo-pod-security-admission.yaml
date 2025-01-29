@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-audit-baseline
+  labels:
+    pod-security.kubernetes.io/audit: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-audit-restricted
+  labels:
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-audit-privileged
+  labels:
+    pod-security.kubernetes.io/audit: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-warn-baseline
+  labels:
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-warn-restricted
+  labels:
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-warn-privileged
+  labels:
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-enforce-baseline
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-enforce-restricted
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psa-enforce-privileged
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
