@@ -1,0 +1,120 @@
+---
+sidebar_position: 2001
+---
+
+# 🔄 Application Lifecycle - ConfigMap Mounted in Pod Config File
+
+# Configuring Redis with Kubernetes ConfigMaps
+
+This guide demonstrates how to use Kubernetes ConfigMaps to manage Redis configuration and verify the applied settings.
+
+## Step 1: Create the ConfigMap
+
+Create a ConfigMap with the desired Redis configuration:
+
+<details>
+<summary>ConfigMap YAML</summary>
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  redis-config: |
+    maxmemory 2mb
+    maxmemory-policy allkeys-lru
+```
+
+</details>
+
+## Step 2: Create the Redis Pod
+
+Create a Redis Pod that mounts the ConfigMap:
+
+<details>
+<summary>Pod YAML</summary>
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: redis-pod
+  name: redis-pod
+spec:
+  containers:
+  - image: redis:7
+    name: redis-pod
+    ports:
+    - containerPort: 6379
+    command:
+    - redis-server
+    - "/redis-master/redis.conf"
+    volumeMounts:
+    - name: config
+      mountPath: /redis-master
+  volumes:
+  - name: config
+    configMap:
+      name: redis-config
+      items:
+      - key: redis-config
+        path: redis.conf
+```
+
+</details>
+
+Apply the configuration:
+
+```bash
+kubectl apply -f redis-pod.yaml
+```
+
+## Step 3: Verify the Configuration
+
+Check if the configuration was applied correctly:
+
+<details>
+<summary>Verification Commands</summary>
+
+```bash
+kubectl exec redis-pod -- redis-cli CONFIG GET maxmemory
+kubectl exec redis-pod -- redis-cli CONFIG GET maxmemory-policy
+```
+
+</details>
+
+<details>
+<summary>Expected Output</summary>
+
+```
+maxmemory
+2097152
+maxmemory-policy
+allkeys-lru
+```
+
+This output confirms that our configuration was successfully applied:
+- `maxmemory` is set to 2097152 bytes (2MB)
+- `maxmemory-policy` is set to `allkeys-lru`
+
+</details>
+
+## Troubleshooting Tips
+
+<details>
+<summary>Common Issues and Solutions</summary>
+
+1. **Incorrect Syntax**: Ensure the configuration syntax matches what the application expects. For Redis, use a space between the directive and value:
+   ```
+   maxmemory 2mb
+   ```
+
+2. **Mount Path**: Verify that the ConfigMap is mounted at the correct path that Redis is reading from.
+
+3. **Pod Restart**: If you update the ConfigMap, remember that you may need to restart the Pod for changes to take effect.
+
+4. **Permissions**: Ensure the mounted ConfigMap file has the correct permissions for Redis to read it.
+
+</details>

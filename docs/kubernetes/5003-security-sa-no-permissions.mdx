@@ -1,0 +1,70 @@
+---
+sidebar_position: 5003
+---
+
+# 🔒 Security - Create a Pod with No Admin API Permission
+
+When creating a pod in Kubernetes, it's important to consider the permissions granted to the pod. By default, pods are associated with a service account that has certain permissions, including access to the Kubernetes API. However, you may want to restrict the pod's access to the API for security reasons. Here are two methods to create a pod with no admin API permission, based on the Kubernetes documentation.
+
+## Method 1: Opt Out of API Credential Automounting
+
+Opt out of API credential automounting for the associated service account:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: build-robot
+automountServiceAccountToken: false
+```
+
+Create a pod using this service account:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+spec:
+  serviceAccountName: build-robot
+  containers:
+    - name: my-container
+      image: my-image
+```
+
+## Method 2: Use a Service Account with No Permissions
+
+Create a service account with no permissions:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: no-permissions
+```
+
+Use this service account in the pod definition:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+spec:
+  serviceAccountName: no-permissions
+  containers:
+    - name: my-container
+      image: my-image
+```
+
+## Comparison Table
+
+| Method                                   | Description                                                  |
+|------------------------------------------|--------------------------------------------------------------|
+| Opt Out of API Credential Automounting   | Disable automatic mounting of API credentials for the pod   |
+| Use a Service Account with No Permissions| Create a service account with no permissions and use it in the pod |
+
+Both methods effectively remove the pod's admin API permission, enhancing the security of your Kubernetes cluster.
+
+References:
+- [Configure Service Accounts for Pods](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)

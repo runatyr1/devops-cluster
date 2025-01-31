@@ -1,0 +1,63 @@
+---
+sidebar_position: 4
+---
+
+# Limiting CPU Usage of a Process
+
+Is there a process that tends to use a lot of CPU but is not that important? You can use **`cpulimit`** to limit a process's CPU usage by its name. Here's how to install and use **`cpulimit`**:
+
+1. Install **`cpulimit`**:
+   - On Debian-based systems like Ubuntu:
+     ```bash
+     sudo apt update
+     sudo apt install cpulimit
+     ```
+   - On Fedora:
+     ```bash
+     sudo dnf install cpulimit
+     ```
+
+2. Identify the process name you want to limit. For example, let's say the process name is **`your_process_name`**.
+
+3. Limit the process's CPU usage to 50%:
+   ```bash
+   cpulimit -e your_process_name -l 50
+   ```
+   The **`-e`** flag specifies the process name, and the **`-l`** flag sets the CPU usage percentage limit.
+
+To make this change permanent and apply the limit automatically every time the system starts, you can create a systemd service:
+
+1. Create a new systemd service file:
+   ```bash
+   sudo nano /etc/systemd/system/cpulimit-your_process_name.service
+   ```
+   Replace **`your_process_name`** with the actual process name.
+
+2. Add the following content to the file, replacing **`your_process_name`** with the actual process name:
+   ```
+   [Unit]
+   Description=CPU limit for your_process_name
+   After=network.target
+   
+   [Service]
+   ExecStart=/usr/bin/cpulimit -e your_process_name -l 50
+   Restart=on-failure
+   
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+3. Save the file and exit the text editor.
+
+4. Enable and start the service:
+   ```bash
+   sudo systemctl enable cpulimit-your_process_name.service
+   sudo systemctl start cpulimit-your_process_name.service
+   ```
+   Replace **`your_process_name`** with the actual process name.
+
+Now, the CPU limit will be applied automatically every time your system starts.
+
+:::note
+**`cpulimit`** might not be the best solution for long-term CPU limiting, as it continuously polls the process and adjusts the CPU usage. For more sophisticated control, consider using Linux control groups (cgroups), which offer more fine-grained resource management for processes.
+:::

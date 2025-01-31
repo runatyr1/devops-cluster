@@ -1,0 +1,137 @@
+---
+sidebar_position: 5002
+---
+
+# 🔒 Security - User certificate auth with certain roles
+
+Practice to grant a user certificate access with certain roles
+As well as practice namespace, role, rolebinding, and user concepts in Kubernetes.
+
+## Steps
+
+<details>
+<summary>1. Create a namespace called "web"</summary>
+
+```bash
+kubectl create namespace web
+```
+
+</details>
+
+<details>
+<summary>2. Create a role in the "web" namespace that allows "get" and "list" actions on pods</summary>
+
+```yaml
+kubectl create role web-role --verb=get --verb=list --resource=pods -n web
+```
+
+</details>
+
+<details>
+<summary>3. Create a rolebinding in the "web" namespace to assign the role to a user named 'carlton'</summary>
+
+```yaml
+kubectl create rolebinding web-rolebinding --role=web-role --user=carlton -n web
+```
+
+</details>
+
+<details>
+<summary>4. Create a pod in the "web" namespace</summary>
+
+```yaml
+kubectl run nginx --image=nginx -n web
+```
+
+</details>
+
+<details>
+<summary>5. Generate a private key for the user 'carlton'</summary>
+
+```bash
+openssl genrsa -out carlton.key 2048
+openssl req -new -key carlton.key -out carlton.csr -subj "/CN=carlton"
+```
+
+</details>
+
+<details>
+<summary>6. Create a Certificate Signing Request (CSR) for 'carlton'</summary>
+
+```bash
+cat carlton.csr | base64 | tr -d "\n"
+```
+
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: carlton
+spec:
+  request: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQ1Z6Q0NBVDhDQVFBd0VqRVFNQTRHQTFVRUF3d0hZMkZ5YkhSdmJqQ0NBU0l3RFFZSktvWklodmNOQVFFQgpCUUFEZ2dFUEFEQ0NBUW9DZ2dFQkFMeVRWalQ1TlFLR29neEMxVDFaVVRQaVBRczhINTNiUG5qWlJBaVdMcTE2CkRheVZ3SlluclIyeWpoWlZ2V1VZU0FGS2w2RWNTYXpsUkUyQnFYYWVhWnNJekJPZCtuN0hQTmtSSmNzMGFvd0gKdmIyd3loZ3hYRk14R2tyZkF4NmJwQitSblVOb0s1RkNOS3BlL1FGZGxjbjVZRUNTQzZnNWpMZ0RrbGFRSHV3dgovdVNGKzBuckRPcXViR1ZtM2hmRzhnR3Bnd0RZQXBmVU5yRVhYajU5MGJ2T3M1NzY4dkdhWnY3MXNMTTlyMDh2CjFtLzIzaGo1UjhMVnFxMTZSREdEUndRWFN4RndQYStpUXR0Y1hpM3ZpZ0hYTEZrVG9mTzRYMmZJOUU2L2dOb3cKTmRFcnhuc3B3SkZKemlCRm1KSzVvc3k2NjZ1RGlUVkh5amtaeitKS3dJa0NBd0VBQWFBQU1BMEdDU3FHU0liMwpEUUVCQ3dVQUE0SUJBUUN1OGdkOHg3WUh6NDh2WENVelNIK2pFM0taRk9Zb2lYcVV1aXRhcFoyK0pXZmNoME9pCkVCNmVIVDNab1RHUno0TFZqNitCcWZPektvMGUzbHV6SVdsNi9nUk5SY2lxZkptWGFZZFhRL3B1d1BaK3ltUkwKdzR1a0lmb1d5bDdodVRvaTA3RzBraWlXYjNVbDRHZVJDMnI0QVdYMUZuRUR5TDJCUm1IdTI0SlBpVjZOc1VkYQpVSU0rV2dzbXRnanpRQ0ppSERDM1Z2OVg2elRVVXBYeTVnNUJ2ekhCeEs5cS9IQTFWaE83WUxzYXpaMktZSlZKCi9wMTRpWFY3S1pTZ1FXbGt3WkVLVGI1SUVlVm5GSVFxNlBqTjQrYktrdUl1Unp1aS9PQ1FmSzJuYWRydnBXdjMKS1VLSzhqaGJtM3Y5TGdyOTl2L21kNjdmQnFPajFidXN4dEFNCi0tLS0tRU5EIENFUlRJRklDQVRFIFJFUVVFU1QtLS0tLQo=
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 86400  # one day
+  usages:
+  - client auth
+EOF
+```
+
+</details>
+
+<details>
+<summary>7. Submit the CSR to the Kubernetes API</summary>
+
+```bash
+kubectl apply -f carlton-csr.yaml
+```
+
+</details>
+
+<details>
+<summary>8. Approve the CSR</summary>
+
+```bash
+kubectl certificate approve carlton
+```
+
+</details>
+
+<details>
+<summary>9. Extract the client certificate from the approved CSR</summary>
+
+```bash
+kubectl get csr carlton -o jsonpath='{.status.certificate}'| base64 -d > carlton.crt
+```
+
+</details>
+
+<details>
+<summary>10. Set up the kubeconfig with the new user credentials</summary>
+
+```bash
+kubectl config set-credentials carlton --client-key=carlton.key --client-certificate=carlton.crt --embed-certs=true
+```
+
+</details>
+
+<details>
+<summary>11. Set and use a new context for the 'carlton' user</summary>
+
+```bash
+kubectl config set-context carlton --cluster=kubernetes --user=carlton
+kubectl config use-context carlton
+```
+
+</details>
+
+<details>
+<summary>12. Test if 'carlton' can get pods in the "web" namespace</summary>
+
+```bash
+kubectl get pods -n web
+```
+
+</details>
+
+By following these steps, you have successfully created a namespace, role, rolebinding, and user in Kubernetes. The user 'carlton' now has the ability to get and list pods in the "web" namespace.

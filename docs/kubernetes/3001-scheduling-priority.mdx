@@ -1,0 +1,155 @@
+---
+sidebar_position: 3001
+---
+
+# ⏰ Scheduling - Priorities
+
+Priority and PriorityClass help control pod scheduling and preemption in Kubernetes clusters. This guide demonstrates practical use cases with examples.
+
+## Core Concepts
+
+- **Priority**: Numerical value ([-2147483648 to 1000000000]) determining pod scheduling importance
+- **PriorityClass**: Kubernetes object defining priority levels
+- **PreemptionPolicy**: Controls whether pods can evict lower-priority pods
+
+## Basic PriorityClass Definition
+
+<details>
+<summary>Create a basic PriorityClass</summary>
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+description: "High priority service pods"
+```
+
+</details>
+
+```bash
+# Output after creation
+priorityclass.scheduling.k8s.io/high-priority created
+```
+
+## Common Use Cases
+
+### 1. Production vs Development Workloads
+
+Create priority hierarchy for multi-environment clusters:
+
+<details>
+<summary>Define environment priorities</summary>
+
+```yaml
+# Production Priority
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: prod-critical
+value: 1000000
+---
+# Development Priority
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: dev-workload
+value: 10000
+```
+
+</details>
+
+Apply to deployments:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prod-service
+spec:
+  template:
+    spec:
+      priorityClassName: prod-critical
+      containers:
+      - name: app
+        image: app:1.0
+```
+
+### 2. Background Jobs
+
+Implement non-disruptive background tasks:
+
+<details>
+<summary>Configure background job priority</summary>
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: background
+value: 5000
+preemptionPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cleanup-job
+spec:
+  template:
+    spec:
+      priorityClassName: background
+      containers:
+      - name: cleanup
+        image: cleanup:1.0
+```
+
+</details>
+
+### 3. System Components
+
+Ensure critical system pods always run:
+
+<details>
+<summary>Define system component priority</summary>
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: system-component
+value: 2000000000
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: monitoring
+spec:
+  template:
+    spec:
+      priorityClassName: system-component
+      containers:
+      - name: monitor
+        image: monitor:1.0
+```
+
+</details>
+
+## Priority Rules
+
+1. Higher values = higher priority
+2. System-critical pods: priority > 1000000000
+3. Default priority: 0 (when no PriorityClass specified)
+4. PreemptionPolicy controls pod eviction behavior
+
+## Best Practices
+
+- Use consistent priority ranges per environment
+- Document priority values in cluster policies
+- Test preemption behavior in non-production first
+- Monitor pod preemption events
+
+## References
+
+- [Kubernetes Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/)

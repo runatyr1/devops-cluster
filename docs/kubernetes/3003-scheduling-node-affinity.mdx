@@ -1,0 +1,90 @@
+---
+sidebar_position: 3003
+---
+
+# ⏰ Scheduling - Node Affinity
+
+Node affinity is a way to control which nodes a pod can be scheduled on based on labels on the nodes. It provides a more expressive syntax than `nodeSelector` for controlling where pods are scheduled.
+
+## Example: Prefer Scheduling on Specific Nodes
+
+Let's look at an example of using node affinity to prefer scheduling a pod on nodes with specific labels.
+
+<details>
+<summary>Pod Config</summary>
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: az1-pod
+  name: az1-pod
+  namespace: 012963bd
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 80
+        preference:
+          matchExpressions:
+          - key: availability-zone
+            operator: In
+            values:
+            - zone1
+      - weight: 20
+        preference:
+          matchExpressions:
+          - key: availability-zone
+            operator: In
+            values:
+            - zone2
+  containers:
+  - image: nginx:1.24.0
+    name: az1-pod
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+```
+
+</details>
+
+This pod config uses `preferredDuringSchedulingIgnoredDuringExecution` to specify that the pod should prefer to be scheduled on a node with the label `availability-zone=zone1` with a weight of 80, and `availability-zone=zone2` with a weight of 20.
+
+To verify that the affinity is in the running config, you can use the following command:
+
+```bash
+kubectl describe pod az1-pod -n 012963bd
+```
+
+Look for the `Node-Affinity` field in the output to see the affinity rules.
+
+## Anti-Affinity
+
+Anti-affinity is the opposite of affinity - it allows you to specify that a pod should not be scheduled on a node with certain labels. 
+
+For example, you could use anti-affinity to ensure that pods from the same application are not scheduled on the same node, for high availability:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-server
+spec:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - web-store
+        topologyKey: "kubernetes.io/hostname"
+```
+
+This would prevent multiple pods with the label `app=web-store` from being scheduled on the same node.
+
+For more details, see the [Kubernetes docs on affinity and anti-affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity).

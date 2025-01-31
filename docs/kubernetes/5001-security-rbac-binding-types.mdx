@@ -1,0 +1,162 @@
+---
+sidebar_position: 5001
+---
+
+# 🔒 Security - RBAC and Namespace Scoping
+
+RBAC (Role-Based Access Control) in Kubernetes has some important nuances when it comes to namespace scoping. Understanding these differences is crucial for proper access management.
+
+## Users vs ServiceAccounts
+
+When working with RBAC subjects, there's a fundamental difference between Users and ServiceAccounts:
+
+- **Users** are cluster-scoped resources and exist across all namespaces
+- **ServiceAccounts** are namespace-scoped and belong to a specific namespace
+
+This becomes visible when examining RoleBinding descriptions:
+
+<details>
+<summary>User Binding Example</summary>
+
+```bash
+$ kubectl describe rolebinding user-binding
+Name:         user-binding
+Role:
+  Kind:  Role
+  Name:  developer
+Subjects:
+  Kind  Name   Namespace
+  ----  ----   ---------
+  User  jane   # Namespace is empty because Users are cluster-scoped
+```
+</details>
+
+<details>
+<summary>ServiceAccount Binding Example</summary>
+
+```bash
+$ kubectl describe rolebinding sa-binding
+Name:         sa-binding
+Role:
+  Kind:  Role
+  Name:  developer
+Subjects:
+  Kind            Name    Namespace
+  ----            ----    ---------
+  ServiceAccount  app-sa  frontend  # Namespace is required for ServiceAccounts
+```
+</details>
+
+## Role vs ClusterRole Bindings
+
+There are two ways to bind roles in Kubernetes, each with different namespace behavior:
+
+### RoleBinding
+
+- Namespace-scoped
+- Can bind to either Roles or ClusterRoles
+- When binding to a ClusterRole, the permissions are restricted to the RoleBinding's namespace
+
+<details>
+<summary>RoleBinding with ClusterRole Example</summary>
+
+```bash
+# Create a RoleBinding that references a ClusterRole
+$ kubectl create rolebinding dev-view \
+    --clusterrole=view \
+    --user=jane \
+    --namespace=development
+
+# This gives Jane "view" permissions only in the "development" namespace
+```
+</details>
+
+### ClusterRoleBinding
+
+- Cluster-scoped
+- Can only bind to ClusterRoles
+- Permissions apply across all namespaces
+- The `--namespace` flag is ignored in creation
+
+<details>
+<summary>ClusterRoleBinding Example</summary>
+
+```bash
+# Create a ClusterRoleBinding
+$ kubectl create clusterrolebinding global-view \
+    --clusterrole=view \
+    --user=jane \
+    --namespace=development  # This namespace flag has no effect!
+
+# This gives Jane "view" permissions across ALL namespaces
+```
+</details>
+
+## Best Practices
+
+- Use RoleBindings with namespaces for fine-grained access control
+- Use ClusterRoleBindings only when cluster-wide access is required
+- Be aware that the `--namespace` flag is ignored in ClusterRoleBinding creation
+- Remember that User subjects don't need namespace specification
+- Always specify namespaces for ServiceAccount subjects
+
+## Common Patterns
+
+Here's a typical setup showing both namespace-scoped and cluster-wide permissions:
+
+<details>
+<summary>Complete RBAC Setup Example</summary>
+
+```yaml
+# Create a namespace-scoped Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: applications
+  name: pod-manager
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+---
+# Bind it to a User (namespace-scoped)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: applications
+  name: pod-manager-binding
+subjects:
+- kind: User
+  name: jane
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind a ClusterRole to a ServiceAccount (namespace-scoped)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: applications
+  name: viewer-binding
+subjects:
+- kind: ServiceAccount
+  name: app-viewer
+  namespace: applications
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+```
+</details>
+
+## Troubleshooting Tips
+
+If you're seeing unexpected permission behavior:
+
+1. Check if you're using RoleBinding or ClusterRoleBinding
+2. Verify the namespace context for RoleBindings
+3. Remember that ClusterRoleBindings ignore namespace specifications
+4. Ensure ServiceAccounts have correct namespace specifications
+5. Remember that User subjects don't need namespace specifications

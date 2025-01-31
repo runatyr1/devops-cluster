@@ -1,0 +1,152 @@
+---
+sidebar_position: 7001
+---
+
+# 🌐 Networking - Modifying Cluster DNS in Kubernetes
+
+To change the DNS configuration in a Kubernetes cluster, several components need to be updated. This article walks through the steps to modify the service cluster IP range, update the `kube-dns` service, and reconfigure the kubelet.
+
+## Modifying the API Server Configuration
+
+First, update the Kubernetes API server to change the service cluster IP range to `100.96.0.0/12`. Edit the `/etc/kubernetes/manifests/kube-apiserver.yaml` file:
+
+<details>
+<summary>Modify kube-apiserver.yaml</summary>
+
+```yaml
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    ...
+    - --service-cluster-ip-range=100.96.0.0/12
+    ...
+```
+</details>
+
+## Updating the kube-dns Service
+
+Next, change the IP address of the cluster's DNS service, `kube-dns`, in the `kube-system` namespace:
+
+<details>
+<summary>Edit kube-dns service</summary>
+
+```bash
+kubectl -n kube-system edit svc kube-dns
+```
+
+```yaml
+spec:
+  clusterIP: 100.96.0.10
+  clusterIPs:
+  - 100.96.0.10
+  ...
+```
+</details>
+
+To apply the changes, replace the service with the modified YAML:
+
+```bash
+kubectl replace -f /tmp/kubectl-edit-<random>.yaml --force
+```
+
+Verify the new IP address:
+
+```bash
+kubectl -n kube-system get svc
+```
+
+Output:
+```
+NAME       TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                  AGE
+kube-dns   ClusterIP   100.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   6s
+```
+
+## Updating the Kubelet Configuration
+
+Modify the kubelet configuration on the node to use the new cluster DNS:
+
+<details>
+<summary>Edit kubelet config.yaml</summary>
+
+```bash
+vim /var/lib/kubelet/config.yaml
+```
+
+```yaml
+...
+clusterDNS:
+- 100.96.0.10
+...
+```
+</details>
+
+Update the kubelet ConfigMap in the `kube-system` namespace:
+
+<details>
+<summary>Edit kubelet-config ConfigMap</summary>
+
+```bash
+kubectl -n kube-system edit cm kubelet-config
+```
+
+```yaml
+data:
+  kubelet: |
+    ...
+    clusterDNS:
+    - 100.96.0.10
+    ...
+```
+</details>
+
+Apply the kubelet configuration update:
+
+```bash
+kubeadm upgrade node phase kubelet-config
+systemctl daemon-reload
+systemctl restart kubelet
+```
+
+## Verifying the Changes
+
+Start a test pod and verify the DNS configuration:
+
+<details>
+<summary>Start netshoot pod</summary>
+
+```bash
+kubectl run netshoot --image=nicolaka/netshoot --command sleep --command "3600"
+```
+</details>
+
+Get a shell to the pod and check `/etc/resolv.conf`:
+
+<details>
+<summary>Check resolv.conf</summary>
+
+```bash
+kubectl exec -it netshoot -- bash
+cat /etc/resolv.conf
+```
+</details>
+
+Test DNS resolution using `nslookup`:
+
+```bash
+nslookup example.com
+```
+
+So in summary remember to update:
+
+- The apiserver manifest at: `/etc/kubernetes/manifests/kube-apiserver.yaml`
+- The dns service, in this case: `k -n kube-system edit service kube-dns` (needs recreate)
+- kubelet config: `/var/lib/kubelet/config.yaml`
+- kubelet config map: `k -n kube-system edit cm kubelet-config`
+- refresh kubelet config:
+`kubeadm upgrade node phase kubelet-config`
+`systemctl daemon-reload`
+`systemctl restart kubelet`
+- verify changes creating a pod and checking it's `/etc/resolv.conf`
+
+This is not normally needed in production environments. It is for practicing Kubernetes.

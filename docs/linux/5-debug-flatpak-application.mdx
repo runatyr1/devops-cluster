@@ -1,0 +1,51 @@
+---
+sidebar_position: 5
+---
+
+# Debugging a Crashing Flatpak Application
+
+To debug a crashing Flatpak application, follow these steps:
+
+1. Install the Flatpak SDK for your desktop environment. For KDE, use:
+   ```bash
+   flatpak install flathub org.kde.Sdk//5.15-21.08
+   ```
+
+2. Install GDB (GNU Debugger) using your package manager. For dnf:
+   ```bash
+   sudo dnf install gdb
+   ```
+
+3. List the Flatpak applications to find the application ID. For example, to find the "megasync" app:
+   ```bash
+   flatpak list | { head -n 1; grep -i megasync; }
+   ```
+
+4. Find the location of the binary in the Flatpak sandbox. Replace `nz.mega.MEGAsync` with your app ID:
+   ```bash
+   flatpak run --devel --command=sh nz.mega.MEGAsync
+   find /app -iname 'megasync'
+   ```
+
+5. Run the Flatpak application in development mode using GDB. Replace `nz.mega.MEGAsync` and `/app/bin/megasync` with your app ID and binary path:
+   ```bash
+   flatpak run --devel --command=gdb nz.mega.MEGAsync /app/bin/megasync
+   ```
+
+6. Type `run` at the (gdb) prompt and wait for the application to start.
+
+7. When the app crashes, copy the output around the error. For example:
+   ```
+   [Thread 0x7fffa37fe640 (LWP 1451) exited]
+   [New Thread 0x7fffa37fe640 (LWP 1453)]
+   [Thread 0x7fffa37fe640 (LWP 1453) exited]
+   Thread 1 "megasync" received signal SIGSEGV, Segmentation fault.
+   0x00007ffff455321c in __longjmp () from /usr/lib/x86_64-linux-gnu/libc.so.6
+   [1]+  Stopped                 flatpak run --devel --command=gdb nz.mega.MEGAsync /app/bin/megasync
+   ```
+
+8. If the GDB prompt is still running, type `backtrace` and copy the information.
+
+9. Investigate the error and report it in the corresponding Flathub repository, such as https://github.com/flathub/nz.mega.MEGAsync/issues for the "megasync" app.
+
+By following these steps, you can effectively debug a crashing Flatpak application and gather the necessary information to report the issue.

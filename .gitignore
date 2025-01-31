@@ -20,6 +20,7 @@ kubernetes/**/*.secret
 kubeconfig
 .kube/
 **/kubeconfig*
+kubernetes/base/manifests/hetzner-csi.yaml
 
 # Local environment
 .env
