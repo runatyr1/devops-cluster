@@ -1,0 +1,68 @@
+---
+sidebar_position: 4001
+---
+
+# 📊 Logging & Monitoring - Sidecar Containers
+
+In Kubernetes, you can use sidecar containers to collect logs from the main container in a pod. Here's an example of how to set this up:
+
+<details>
+<summary>pod-logging-sidecar.yaml</summary>
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-logging-sidecar
+spec:
+  containers:
+  - image: busybox
+    name: main
+    args: [ 'sh', '-c', 'while true; do echo "$(date)\n" >> /var/log/main-container.log; sleep 5; done' ]
+    volumeMounts:
+      - name: varlog
+        mountPath: /var/log
+  - name: sidecar
+    image: busybox
+    args: [ /bin/sh, -c, 'tail -f /var/log/main-container.log' ]
+    volumeMounts:
+      - name: varlog
+        mountPath: /var/log
+  volumes:
+    - name: varlog
+      emptyDir: {}
+```
+
+</details>
+
+This pod definition has two containers:
+1. The `main` container writes logs to `/var/log/main-container.log` every 5 seconds
+2. The `sidecar` container tails the log file from the main container
+
+Both containers mount a shared `emptyDir` volume at `/var/log` to access the log file.
+
+To view the logs from the sidecar container, use:
+
+```bash
+kubectl logs pod-logging-sidecar -c sidecar
+```
+
+To view logs from all containers in the pod:
+
+```bash
+kubectl logs pod-logging-sidecar --all-containers
+```
+
+And to follow the logs:
+
+```bash
+kubectl logs pod-logging-sidecar --all-containers -f
+```
+
+## Why use a sidecar container for logging?
+
+Sidecar containers are useful for logging because:
+- They allow separating logging concerns from the main application 
+- The main container doesn't need to be modified to send logs externally
+- Logs can be collected, processed, and shipped by the sidecar without impacting the main workload
+- Different sidecar logging implementations can be used with the same main container

@@ -1,0 +1,127 @@
+---
+sidebar_position: 4002
+---
+
+# 📊 Logging & Monitoring - JSONPath Practice
+
+JSONPath is a query language for JSON that allows you to extract and manipulate data from JSON documents. It is commonly used in Kubernetes to filter and format the output of `kubectl` commands.
+
+Here are some exercises to practice JSONPath queries on a Kubernetes service object, which could be helpful for the CKA exam.
+
+Given the following JSON output from `kubectl get svc redis-service -o json`:
+
+```json
+{
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+        "creationTimestamp": "2024-10-14T19:51:23Z",
+        "labels": {
+            "app": "redis-service"
+        },
+        "name": "redis-service",
+        "namespace": "default",
+        "resourceVersion": "5060",
+        "uid": "5d77be24-829e-4d55-a536-993acf442c54"
+    },
+    "spec": {
+        "clusterIP": "10.110.103.98",
+        "clusterIPs": [
+            "10.110.103.98"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+            "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+            {
+                "name": "6379-6379",
+                "port": 6379,
+                "protocol": "TCP",
+                "targetPort": 6379
+            }
+        ],
+        "selector": {
+            "app": "redis-service"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+    },
+    "status": {
+        "loadBalancer": {}
+    }
+}
+```
+
+Try the following exercises:
+
+1. Get the `targetPort` of the first port in the `ports` array:
+
+<details>
+<summary>Show command</summary>
+
+```bash
+kubectl get svc redis-service -o jsonpath='{.spec.ports[0].targetPort}'
+```
+</details>
+
+```
+6379
+```
+
+2. Get the `clusterIP` of the service:
+
+<details>
+<summary>Show command</summary>
+
+```bash
+kubectl get svc redis-service -o jsonpath='{.spec.clusterIP}'
+```
+</details>
+
+```
+10.110.103.98
+```
+
+3. Get the value of the `app` label in the `metadata`:
+
+<details>
+<summary>Show command</summary>
+
+```bash
+kubectl get svc redis-service -o jsonpath='{.metadata.labels.app}'
+```
+</details>
+
+```
+redis-service
+```
+
+4. Get the `name` and `port` of all the ports as a list:
+
+<details>
+<summary>Show command</summary>
+
+```bash
+kubectl get svc redis-service -o jsonpath='{range .spec.ports[*]}{.name}{"\t"}{.port}{"\n"}{end}'
+```
+</details>
+
+```
+6379-6379   6379
+```
+
+5. Get the `type` of the service:
+
+<details>
+<summary>Show command</summary>
+
+```bash
+kubectl get svc redis-service -o jsonpath='{.spec.type}'
+```
+</details>
+
+```
+ClusterIP
+```

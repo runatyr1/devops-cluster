@@ -1,0 +1,178 @@
+# RBAC for deployment patching
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: docs-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: docs-patch-role
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: docs-patch-rb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: docs-patch-role
+subjects:
+- kind: ServiceAccount
+  name: docs-sa
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: docs-pvc
+spec:
+  storageClassName: hcloud-volumes
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docs-website-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docs-website-prod
+  template:
+    metadata:
+      labels:
+        app: docs-website-prod
+      annotations:
+        buildTimestamp: "2023-09-01"
+    spec:
+      containers:
+      - name: astro
+        image: localhost:5000/docs-website:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: docs-content
+          mountPath: /docs-content
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          timeoutSeconds: 5
+      volumes:
+      - name: docs-content
+        persistentVolumeClaim:
+          claimName: docs-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docs-website-prod
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: docs-website-prod
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: docs-website-prod
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - pietro.top
+    secretName: docs-website-tls
+  rules:
+  - host: pietro.top
+    http:
+      paths:
+      - path: /docs(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: docs-website-prod
+            port:
+              number: 80
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: docs-sync
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: git-sync
+            image: alpine/git
+            command:
+            - /bin/sh
+            - -c
+            - |
+              cd /content && \
+              if [ -d .git ]; then 
+                git pull origin main; 
+              else 
+                git clone --branch main --depth 1 https://github.com/runatyr1/devops-cluster.git .; 
+              fi
+            volumeMounts:
+            - name: docs-content
+              mountPath: /content
+              subPath: docs
+          - name: trigger-rebuild
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -X PATCH \
+              -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+              -H "Content-Type: application/strategic-merge-patch+json" \
+              --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+              -d '{"spec":{"template":{"metadata":{"annotations":{"buildTimestamp":"'$(date +%s)'"}}}}}' \
+              https://kubernetes.default.svc/apis/apps/v1/namespaces/default/deployments/docs-website-prod
+            volumeMounts:
+            - name: sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+          restartPolicy: OnFailure
+          serviceAccountName: docs-sa
+          volumes:
+          - name: docs-content  # Must match PVC name in cluster
+            persistentVolumeClaim:
+              claimName: docs-pvc
+          - name: sa-token
+            projected:
+              sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+

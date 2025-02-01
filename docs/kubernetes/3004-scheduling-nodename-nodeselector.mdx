@@ -1,0 +1,105 @@
+---
+sidebar_position: 3004
+---
+
+# ⏰ Scheduling - Pods with nodeName and nodeSelector
+
+When deploying pods in Kubernetes, you can control which nodes they are scheduled on using the `nodeName` or `nodeSelector` fields in the pod spec. Let's explore these two methods and compare their differences.
+
+## Practice
+
+### Step 1: Scheduling with nodeName
+
+<details>
+<summary>Toggle to view the YAML config</summary>
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-nodename
+spec:
+  containers:
+  - image: nginx
+    name: web-server
+  nodeName: node1
+```
+
+</details>
+
+To schedule a pod on a specific node using `nodeName`:
+
+1. Set the `nodeName` field in the pod spec to the name of the desired node.
+2. Apply the configuration:
+
+```bash
+kubectl apply -f pod-with-nodename.yaml
+```
+
+3. Verify the pod is scheduled on the specified node:
+
+```bash
+kubectl get pods -o wide
+```
+
+### Step 2: Scheduling with nodeSelector
+
+<details>
+<summary>Toggle to view the YAML config</summary>
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-nodeselector
+spec:
+  containers:
+  - image: nginx
+    name: web-server
+  nodeSelector:
+    disktype: ssd
+```
+
+</details>
+
+To schedule a pod using `nodeSelector`:
+
+1. Add labels to the nodes you want to select:
+
+```bash
+kubectl label nodes node2 disktype=ssd
+```
+
+2. Set the `nodeSelector` field in the pod spec with the desired label key-value pair.
+3. Apply the configuration:
+
+```bash
+kubectl apply -f pod-with-nodeselector.yaml
+```
+
+4. Verify the pod is scheduled on a node with the matching label:
+
+```bash
+kubectl get pods -o wide
+```
+
+## Comparison
+
+Let's compare `nodeName` and `nodeSelector` using a sample scenario:
+
+- You have a 3-node cluster with nodes named `node1`, `node2`, and `node3`.
+- `node1` and `node2` have SSDs attached and are labeled with `disktype=ssd`.
+- You want to deploy a pod that requires high disk I/O performance.
+
+| Aspect | nodeName | nodeSelector |
+|--------|----------|--------------|
+| Specificity | Schedules the pod on a specific node by name | Schedules the pod on any node matching the label selector |
+| Flexibility | Inflexible, tied to a single node | Flexible, can schedule on multiple nodes with matching labels |
+| Maintenance | Requires updating the pod spec when the node changes | Allows updating node labels without modifying the pod spec |
+| Load Balancing | Manual load balancing by specifying nodes | Automatic load balancing across nodes with matching labels |
+
+In this scenario, using `nodeSelector` with `disktype=ssd` would be more flexible and maintainable, as the pod can be scheduled on either `node1` or `node2` without modifying the pod spec. This allows for better load balancing and easier updates to the cluster configuration.
+
+## Conclusion
+
+Both `nodeName` and `nodeSelector` provide ways to control pod scheduling in Kubernetes. While `nodeName` is more specific, `nodeSelector` offers greater flexibility and maintainability. Choose the method that best fits your application requirements and cluster management strategy.

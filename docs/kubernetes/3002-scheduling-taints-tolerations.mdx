@@ -1,0 +1,78 @@
+---
+sidebar_position: 3002
+---
+
+# ⏰ Scheduling - Taints in Nodes and Tolerations on Pods
+
+In Kubernetes, taints and tolerations work together to control which nodes can schedule pods. Taints are applied to nodes, and tolerations are specified in pod specifications. Let's explore how to find taints in nodes and add tolerations to pods.
+
+## Finding Taints in Nodes
+
+To find taints in nodes, you can use the following `kubectl` command:
+
+```bash
+kubectl get nodes -o='custom-columns=NodeName:.metadata.name,TaintKey:.spec.taints[*].key,TaintValue:.spec.taints[*].value,TaintEffect:.spec.taints[*].effect'
+```
+
+This command retrieves the nodes and displays the node name, taint key, taint value, and taint effect in a custom-formatted output.
+
+## Adding Tolerations to Pods
+
+To add tolerations to a pod, you need to specify them in the pod's YAML configuration file. Here are a few examples of different toleration types:
+
+```yaml
+tolerations:
+- key: "key1"
+  operator: "Equal"
+  value: "value1"
+  effect: "NoSchedule"
+```
+
+In this example, the toleration matches a taint with the key "key1", value "value1", and effect "NoSchedule".
+
+```yaml
+tolerations:
+- key: "key1"
+  operator: "Exists"
+  effect: "NoSchedule"
+```
+
+This toleration matches any taint with the key "key1" and effect "NoSchedule", regardless of the taint's value.
+
+Here's a complete example of a pod configuration with tolerations:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    env: test
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    imagePullPolicy: IfNotPresent
+  tolerations:
+  - key: "example-key"
+    operator: "Exists"
+    effect: "NoSchedule"
+```
+
+In this example, the pod has a toleration that matches any taint with the key "example-key" and effect "NoSchedule".
+
+It's important to note that if you manually specify the `.spec.nodeName` for a pod, it bypasses the default Kubernetes scheduler and the pod is bound to the specified node, even if there are `NoSchedule` taints on that node. 
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: taint-bypass-pod
+spec:
+  nodeName: node-with-taint  # This bypasses scheduler and taints
+  containers:
+  - name: nginx
+    image: nginx
+```
+
+However, if the node also has a `NoExecute` taint set, the kubelet will eject the pod unless there is an appropriate toleration defined.

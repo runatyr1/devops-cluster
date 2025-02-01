@@ -1,0 +1,68 @@
+---
+sidebar_position: 6
+---
+
+# Resizing zRAM Swap in Linux
+
+To resize the zRAM swap in Linux, follow these steps:
+
+1. Verify that you are using zRAM:
+
+```bash
+swapon --show
+```
+
+The output should show a zram file like this:
+
+```
+NAME       TYPE       SIZE USED PRIO
+/dev/zram0 partition 31.2G 9.7G  100
+```
+
+2. Deactivate the current zRAM swap device:
+
+```bash
+sudo swapoff /dev/zram0
+```
+
+:::caution
+Deactivating the zRAM swap device might temporarily slow down your system as the contents of the swap will be transferred back to the RAM.
+:::
+
+3. Create a new swap file with the desired size (64GB):
+
+```bash
+sudo fallocate -l 64G /swapfile
+```
+
+4. Set the correct permissions for the swap file:
+
+```bash
+sudo chmod 600 /swapfile
+```
+
+5. Format the swap file as swap:
+
+```bash
+sudo mkswap /swapfile
+```
+
+6. Enable the new swap file:
+
+```bash
+sudo swapon /swapfile
+```
+
+7. Make the swap file persistent across reboots by adding an entry in `/etc/fstab`:
+
+```bash
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+8. Reboot your system to ensure the new swap file is functioning correctly:
+
+```bash
+sudo reboot
+```
+
+After completing these steps, you should have a 64GB swap file enabled on your system. You can verify this by running `swapon --show` or `free -h`.

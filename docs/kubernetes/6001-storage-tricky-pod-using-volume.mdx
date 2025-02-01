@@ -1,0 +1,196 @@
+---
+sidebar_position: 6001
+---
+
+# 💾 Storage - Tricky Pod Using PV, PVC and SC
+
+In this exercise, we'll walk through the process of setting up storage components in a Kubernetes cluster. This includes creating a Storage Class, Persistent Volume (PV), Persistent Volume Claim (PVC), and a Pod that uses the storage.
+
+## Exercise Steps
+
+### Step 1: Create a Storage Class
+
+Create a Storage Class named `blue-stc-cka` with the following properties:
+
+- Provisioner: `kubernetes.io/no-provisioner`
+- Volume binding mode: `WaitForFirstConsumer`
+
+<details>
+<summary>Solution</summary>
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blue-stc-cka
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
+Apply this configuration using `kubectl apply -f storageclass.yaml`.
+</details>
+
+```bash
+kubectl get sc blue-stc-cka
+```
+
+### Step 2: Create a Persistent Volume (PV)
+
+Create a PV named `blue-pv-cka` with the following properties:
+
+- Capacity: 100Mi
+- Access mode: ReadWriteOnce
+- Reclaim policy: Retain
+- Storage class: `blue-stc-cka`
+- Local path: `/opt/blue-data-cka`
+- Node affinity: Set node affinity to create this PV on controlplane
+
+<details>
+<summary>Solution</summary>
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: blue-pv-cka
+spec:
+  capacity:
+    storage: 100Mi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: blue-stc-cka
+  local:
+    path: /opt/blue-data-cka
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+```
+
+Apply this configuration using `kubectl apply -f pv.yaml`.
+</details>
+
+```bash
+kubectl get pv blue-pv-cka
+```
+
+### Step 3: Create a Persistent Volume Claim (PVC)
+
+Create a PVC named `blue-pvc-cka` with the following properties:
+
+- Access mode: ReadWriteOnce
+- Storage class: `blue-stc-cka`
+- Storage request: 50Mi
+- The volume should be bound to `blue-pv-cka`
+
+<details>
+<summary>Solution</summary>
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blue-pvc-cka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 50Mi
+  storageClassName: blue-stc-cka
+  volumeName: blue-pv-cka
+```
+
+Apply this configuration using `kubectl apply -f pvc.yaml`.
+</details>
+
+```bash
+kubectl get pvc blue-pvc-cka
+```
+
+### Step 4: Create a Pod Using the PVC
+
+Create a Pod that uses the PVC we just created.
+
+<details>
+<summary>Solution</summary>
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  volumes:
+    - name: mypd
+      persistentVolumeClaim:
+        claimName: blue-pvc-cka
+  containers:
+    - name: myfrontend
+      image: nginx
+      volumeMounts:
+        - mountPath: "/var/www/html"
+          name: mypd
+  nodeName: controlplane
+```
+
+Apply this configuration using `kubectl apply -f pod.yaml`.
+</details>
+
+```bash
+kubectl get pod mypod
+```
+
+## Troubleshooting and Tips
+
+Throughout this exercise, several challenges were encountered. Here are some troubleshooting tips:
+
+- **PVC Binding Issues**: If the PVC is not binding to the PV, check the following:
+  - Ensure the StorageClass, PV, and PVC configurations match, especially the `storageClassName`.
+  - For StorageClasses with `WaitForFirstConsumer` binding mode, the PVC won't bind until a Pod tries to use it.
+  - Consider specifying the `volumeName` in the PVC to force binding to a specific PV.
+
+- **Pod Scheduling**: If the Pod is not being scheduled:
+  - Check the node selector or `nodeName` in the Pod specification.
+  - Ensure the specified node exists and is ready.
+  - If using control plane nodes, be aware of taints that might prevent scheduling.
+
+- **Volume Mounting Issues**: If the Pod is stuck in `ContainerCreating` state:
+  - Verify that the local path specified in the PV exists on the node.
+  - Check node labels if using node affinity in the PV.
+  - Look for `FailedMount` events in the Pod description.
+
+- **Local Path Preparation**: Remember to create the directory specified in the PV's local path on the correct node:
+
+  ```bash
+  mkdir /opt/blue-data-cka
+  ```
+
+- **Verifying Configuration**: Use these commands to verify your setup:
+
+  ```bash
+  kubectl get pv,pvc,pod
+  kubectl describe pv blue-pv-cka
+  kubectl describe pvc blue-pvc-cka
+  kubectl describe pod mypod
+  ```
+
+- **Testing Volume Mounting**: Once the Pod is running, you can test if the volume is correctly mounted:
+
+  ```bash
+  kubectl exec mypod -- ls /var/www/html
+  ```
+
+Remember, Kubernetes storage configuration can be complex. Always double-check your YAML indentation, and don't hesitate to use `kubectl explain` for help with API object fields.
+
+Also, when looking for information about node labels like node-role.kubernetes.io/control-plane, you can find it in the "Well-Known Labels, Annotations and Taints" page:
+https://kubernetes.io/docs/reference/labels-annotations-taints/
+
+## Conclusion
+
+This exercise demonstrates the intricacies of setting up storage in Kubernetes. By working through these steps and troubleshooting issues, you've gained practical experience with Storage Classes, Persistent Volumes, Persistent Volume Claims, and Pod storage configuration. These skills are crucial for managing stateful applications in Kubernetes environments.

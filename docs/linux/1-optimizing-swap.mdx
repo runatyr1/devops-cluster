@@ -1,0 +1,91 @@
+---
+sidebar_position: 1
+---
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+# Changing from zram to normal swap
+
+<BrowserOnly>
+{() => {
+  const data = [
+    { name: 'Zram', ram: 'More RAM required', disk: 'Reduces disk I/O', cpu: 'Higher CPU usage' },
+    { name: 'Normal Swap', ram: 'No additional RAM', disk: 'Utilizes disk space', cpu: 'Lower CPU usage' },
+  ];
+
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>RAM</th>
+          <th>Disk</th>
+          <th>CPU</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((item, index) => (
+          <tr key={index}>
+            <td>{item.name}</td>
+            <td>{item.ram}</td>
+            <td>{item.disk}</td>
+            <td>{item.cpu}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}}
+</BrowserOnly>
+
+## Checking and Disabling Zram
+
+To check which swap device is being used:
+
+```bash
+swapon
+```
+
+To disable Zram:
+
+```bash
+swapoff /dev/zramX
+```
+
+Check if Zram is auto-enabled by systemd and disable it:
+
+```bash
+systemctl --type swap
+sudo systemctl mask dev-zram0.swap
+```
+
+## Setting Up Normal Swap
+
+For BTRFS filesystem, create a non-snapshot subvolume, initialize, add to swap, and configure `/etc/fstab`:
+
+```bash
+cd /
+sudo touch /swapfile
+sudo chattr +C /swapfile
+sudo dd if=/dev/zero of=/swapfile bs=1M count=1
+sudo fallocate -l 48G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap -U clear /swapfile
+
+sudo vi /etc/fstab
+# Add this line:
+*/swapfile none swap defaults 0 0*
+```
+
+For other filesystems, create a swap file, set permissions, format as swap, enable it, and configure `/etc/fstab`:
+
+```bash
+sudo dd if=/dev/zero of=/swapfile bs=1M count=8k status=progress
+sudo chmod 0600 /swapfile
+sudo mkswap -U clear /swapfile
+sudo swapon /swapfile
+
+vi /etc/fstab
+*/swap/swapfile none swap defaults 0 0*
+```
+

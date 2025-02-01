@@ -1,0 +1,135 @@
+---
+sidebar_position: 2003
+---
+
+# 🔄 Application Lifecycle - Rollout Strategy Change
+
+In this example, we will create a deployment and change its rollout strategy from the default `RollingUpdate` to `Recreate`.
+
+First, let's create a deployment named `source-ip-app` using the `echoserver:1.4` image:
+
+<details>
+<summary>Create deployment</summary>
+
+```bash
+k create deployment source-ip-app --image registry.k8s.io/echoserver:1.4
+```
+
+</details>
+
+```
+deployment.apps/source-ip-app created
+```
+
+We can verify the image used in the deployment:
+
+<details>
+<summary>Verify image</summary>
+
+```bash
+k describe deployments.apps | grep -i image
+k get deployments.apps source-ip-app -o yaml | grep -i image
+```
+
+</details>
+
+```
+    Image:         registry.k8s.io/echoserver:1.4
+      - image: registry.k8s.io/echoserver:1.4
+        imagePullPolicy: IfNotPresent
+```
+
+Now, let's check the current rollout strategy:
+
+<details>
+<summary>Check rollout strategy</summary>
+
+```bash
+k get deployments.apps source-ip-app -o yaml | grep -i strat
+k get deployments.apps source-ip-app -o yaml | grep -i -A6 strat
+```
+
+</details>
+
+```
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+```
+
+To change the rollout strategy to `Recreate`, we can edit the deployment:
+
+<details>
+<summary>Change rollout strategy</summary>
+
+```bash
+k edit deployments.apps source-ip-app
+```
+
+</details>
+
+```
+deployment.apps/source-ip-app edited
+```
+
+Verifying the updated strategy:
+
+<details>
+<summary>Verify updated strategy</summary>
+
+```bash
+k get deployments.apps source-ip-app -o yaml | grep -i -A6 strat
+```
+
+</details>
+
+```
+  strategy:
+    type: Recreate
+```
+
+Finally, let's update the image to `echoserver:1.3`:
+
+<details>
+<summary>Update image</summary>
+
+```bash
+k set image deployments.apps source-ip-app echoserver=registry.k8s.io/echoserver:1.3
+```
+
+</details>
+
+```
+deployment.apps/source-ip-app image updated
+```
+
+We can confirm the image has been updated:
+
+<details>
+<summary>Confirm image update</summary>
+
+```bash
+k get deployments.apps source-ip-app -o yaml | grep -i -A6 conta
+```
+
+</details>
+
+```
+      containers:
+      - image: registry.k8s.io/echoserver:1.3
+        imagePullPolicy: IfNotPresent
+        name: echoserver
+```
+
+And the new pod is running:
+
+```
+k get pod
+```
+
+```
+NAME                             READY   STATUS    RESTARTS   AGE
+source-ip-app-6c4646697d-mm4vk   1/1     Running   0          16s
+```

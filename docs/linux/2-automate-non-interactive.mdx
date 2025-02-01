@@ -1,0 +1,39 @@
+---
+sidebar_position: 2
+---
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+# Automating a Linux non-interactive prompt
+
+`expect` is a powerful tool for automating non-interactive shell prompts. Here's an example of using `expect` to automatically type an `scp` passphrase while sending a file to a remote server:
+
+```bash
+sudo dnf install -y expect; \
+expect -c 'set timeout 10
+set source "src/packages.tgz"
+set destination "root@myserver:"
+set key "src/mykey.key"
+set passphrase "mypassphrase"
+spawn scp -o StrictHostKeyChecking=no -i $key $source $destination;
+expect "Enter passphrase for key.*"
+send "$passphrase\r"
+interact'
+```
+
+The dot star `.*` in the expect string `"Enter passphrase for key.*"` matches anything after that string, since this prompt has additional information.
+
+:::warning
+
+Note: Automating password-related tasks is not secure, but it can be useful for uninportant servers or learning purposes.
+
+:::
+
+
+Alternatively, you can use `sshpass` to solve this use case:
+
+```bash
+sshpass -p "mypassphrase" scp -r user@example.com:/some/remote/path /some/local/path
+```
+
+However, if you need to automate entering information into a shell prompt for something other than an SSH password, `expect` is a valuable tool to have in your arsenal.

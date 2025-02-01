@@ -352,6 +352,16 @@
       changed_when: "'replaced' in kubectl_replace_result.stdout or 'created' in kubectl_replace_result.stdout"
       ignore_errors: yes
     
+    - name: Install Hetzner CSI driver
+      ansible.builtin.shell:
+        cmd: "kubectl apply -f {{ k8s_manifests_path }}/hetzner-csi.yaml"
+      delegate_to: localhost
+      become: no
+      register: kubectl_apply_result
+      changed_when: "'created' in kubectl_apply_result.stdout or 'configured' in kubectl_apply_result.stdout"
+      ignore_errors: no
+
+
     - name: Apply remaining manifests
       ansible.builtin.shell:
         cmd: "kubectl replace --force -f {{ item.path }}"

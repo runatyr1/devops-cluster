@@ -1,0 +1,89 @@
+---
+sidebar_position: 8001
+---
+
+# 🔧 Tshooting - kubectl admin commands unavailable
+
+A good start point for any k8s admin stuff failing is to check kubernetes related logs in a control plane node: `journalctl -f | grep -i kube`
+
+Spot connection errors to the `kube-apiserver` server:
+
+```
+err="Get \"[https://172.30.1.2:6443/api/v1/namespaces/kube-system/pods/kube-apiserver-controlplane\\](https://172.30.1.2:6443/api/v1/namespaces/kube-system/pods/kube-apiserver-controlplane%5C%5C)": dial tcp 172.30.1.2:6443: conne~ct: connection refused"
+```
+
+Monitor the logs from the apiserver pod using `watch ls -l /var/log/pods` and check the log content. In this case, an error showing something wrong in the apiserver config.
+
+The apiserver component is normally created as a static manifest, so check it’s config:
+
+`cat /etc/kubernetes/manifests/kube-apiserver.yaml`
+
+```yaml
+cat /etc/kubernetes/manifests/kube-apiserver.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint: 172.30.1.2:6443
+  creationTimestamp: null
+  labels:
+    component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - --wrong-argument
+```
+
+In this case we verified there is something wrong with the config file
+
+Make a backup:
+
+`cp /etc/kubernetes/manifests/kube-apiserver.yaml ~/kube-apiserver.yaml.bak`
+
+Check the file and fix the mistake:
+
+`nano /etc/kubernetes/manifests/kube-apiserver.yaml`
+
+✅ kubectl should be available again 
+
+👽 Extra info about the `kube-apiserver` 👽
+
+What is the apiserver? It is the front end API of the control plane, it serves to coordinate between control plane node tasks such as scheduling, and worker node tasks such as running the pods
+
+Why is the apiserver a static pod? This component is usually a static pod 
+
+Other causes that could provoke `kubectl` being unavailable: 
+
+- wrong kubeconfig file
+- network issues (firewall, dns)
+- certificate issues
+- authentication and authorization
+- KUBECONFIG env variable wrong
+
+Other issues that can be caused by `apiserver` being unreachable are:
+
+- Unable to  deploy new workloads or update existing ones
+- Helm charts, argo-cd and other deployment tools will fail
+- Autoscaling tools will fail
+- Monitoring solutions that depend on the API server will fail
+- CI/CD pipelines with automated deployments fail
+- Secret and certificate rotation fail
+- **Basically any updates in the cluster would fail**
+
+It is also worth noting that the following is not affected by apiserver being down:
+
+- existing workloads
+- pod to pod communication (kube-proxy)
+- local static pods management (kubelet)
+
+Checking running containers using crictl or docker, would help check if indeed apiserver is running or not, and their los might be useful at some point although if not running due to crashing they may be empty:
+
+- `crictl ps` + `crictl logs`
+- `docker ps` + `docker logs` (in case when Docker is used)
+- `cat /var/log/pods/kube-system_kube-apiserver-<nodename>/kube-apiserver/1.log`
+- `cat /var/log/containers/kube-system_kube-apiserver-<nodename>`
+- `watch ls -l /var/log/pods`  (to monitor a pod being stuck in an error loop that generated new pod logs)
+- `sudo systemctl list-unit-files --type service | grep -i kube`  (check which services are installed as systemd service)

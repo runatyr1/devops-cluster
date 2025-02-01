@@ -1,0 +1,67 @@
+---
+sidebar_position: 1003
+---
+
+# 🏢 Cluster  - Etcd Backup and Restore
+
+In this article, we will go through the process of backing up and restoring the etcd configuration in a Kubernetes cluster.
+
+## Check the Current Configuration
+
+First, let's check if the configuration exists:
+
+```bash
+k get ds -A
+```
+
+## Backup the Configuration
+
+To backup the etcd configuration, use the following command:
+
+```bash
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save snapshot.db
+```
+
+This command creates a snapshot of the etcd configuration and saves it to a file named `snapshot.db`.
+
+## Delete the Configuration
+
+To simulate a configuration loss, let's delete the `kube-proxy` DaemonSet:
+
+```bash
+k delete ds kube-proxy -n kube-system
+```
+
+Now, when you check the configuration again using `k get ds -A`, you will notice that the `kube-proxy` DaemonSet is gone.
+
+## Restore the Configuration
+
+To restore the etcd configuration from the snapshot, follow these steps:
+
+1. Set the `ETCDCTL_API` environment variable:
+
+```bash
+export ETCDCTL_API=3
+```
+
+2. Restore the snapshot:
+
+```bash
+etcdctl --data-dir /var/lib/etcd-restore snapshot restore snapshot.db
+```
+
+3. Edit the etcd manifest file:
+
+```bash
+nano /etc/kubernetes/manifests/etcd.yaml
+```
+
+4. Change the `data-dir` value to `/var/lib/etcd-restore`.
+
+## Verify the Restoration
+
+Finally, check the configuration again using `k get ds -A`. You should see that the `kube-proxy` DaemonSet is back, indicating a successful restoration of the etcd configuration.
+
+By following these steps, you can easily backup and restore the etcd configuration in your Kubernetes cluster, ensuring data integrity and minimizing downtime in case of configuration loss.

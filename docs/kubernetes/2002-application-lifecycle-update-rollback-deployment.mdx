@@ -1,0 +1,206 @@
+---
+sidebar_position: 2002
+---
+
+# 🔄 Application Lifecycle - Update and Rollback a Deployment
+
+In this tutorial, we'll walk through the process of creating, updating, and rolling back a Kubernetes deployment using `kubectl` commands. We'll use an Apache HTTP Server (httpd) as our example application. The commands are hidden to use the article as practice.
+
+## Step 1: Create a Deployment
+
+Let's start by creating a deployment for the Apache HTTP Server.
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl create deployment apache --image httpd
+```
+
+</details>
+
+```
+deployment.apps/apache created
+```
+
+Verify that the pod is running:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl get pod
+```
+
+</details>
+
+```
+NAME                     READY   STATUS    RESTARTS   AGE
+apache-7d8d5c5d5-4j6tq   1/1     Running   0          14s
+```
+
+## Step 2: Update the Deployment
+
+Now, let's update the deployment to use a specific version of httpd.
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl set image deployments apache httpd=httpd:2.4.54
+```
+
+</details>
+
+```
+deployment.apps/apache image updated
+```
+
+Monitor the rollout status:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl get pod -w
+```
+
+</details>
+
+```
+NAME                      READY   STATUS              RESTARTS   AGE
+apache-69d55f464b-85xjs   0/1     ContainerCreating   0          8s
+apache-7d8d5c5d5-4j6tq    1/1     Running             0          79s
+```
+
+## Step 3: Verify the Update
+
+Check the deployment details to confirm the update:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl describe deployments.apps apache
+```
+
+</details>
+
+```
+Name:                   apache
+Namespace:              default
+CreationTimestamp:      Sat, 12 Oct 2024 02:25:42 +0000
+Labels:                 app=apache
+Annotations:            deployment.kubernetes.io/revision: 2
+Selector:               app=apache
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=apache
+  Containers:
+   httpd:
+    Image:         httpd:2.4.54
+    Port:          <none>
+    Host Port:     <none>
+    Environment:   <none>
+    Mounts:        <none>
+  Volumes:         <none>
+...
+```
+
+## Step 4: View Rollout History
+
+To see the rollout history of our deployment:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl rollout history deployment apache
+```
+
+</details>
+
+```
+deployment.apps/apache 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+```
+
+## Step 5: Rollback the Deployment
+
+If we need to revert to the previous version:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl rollout undo deployment apache
+```
+
+</details>
+
+```
+deployment.apps/apache rolled back
+```
+
+## Step 6: Verify the Rollback
+
+Check the deployment details again to confirm the rollback:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl describe deployments.apps apache
+```
+
+</details>
+
+```
+Name:                   apache
+Namespace:              default
+CreationTimestamp:      Sat, 12 Oct 2024 02:25:42 +0000
+Labels:                 app=apache
+Annotations:            deployment.kubernetes.io/revision: 3
+Selector:               app=apache
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=apache
+  Containers:
+   httpd:
+    Image:         httpd
+    Port:          <none>
+    Host Port:     <none>
+    Environment:   <none>
+    Mounts:        <none>
+  Volumes:         <none>
+...
+```
+
+## Step 7: Check Final Rollout Status
+
+Ensure that the rollback was successful:
+
+<details>
+<summary>Command</summary>
+
+```bash
+kubectl rollout status deployment apache
+```
+
+</details>
+
+```
+deployment "apache" successfully rolled out
+```
+
+## Conclusion
+
+In this tutorial, we've learned how to create a Kubernetes deployment, update it with a new image version, view its rollout history, and perform a rollback. These skills are essential for managing applications in a Kubernetes environment, allowing for easy updates and quick recovery from potential issues.

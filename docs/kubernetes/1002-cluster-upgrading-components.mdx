@@ -1,0 +1,93 @@
+---
+sidebar_position: 1002
+---
+
+# 🏢 Cluster - Upgrading with kubeadm
+
+Practice how to add the kubernetes repo in debian based linux, and install or upgrade different components. <br/>
+You can find the installation instructions for kubeadm in the [official Kubernetes documentation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-kubeadm-kubelet-and-kubectl).
+
+
+## Upgrading kubeadm
+
+
+To add the Kubernetes apt repository and install kubeadm, follow these steps:
+
+1. Update your package list and install necessary packages:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+   ```
+
+2. Download the public signing key for the Kubernetes package repositories:
+   ```bash
+   curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+   ```
+
+3. Add the appropriate Kubernetes apt repository:
+   ```bash
+   echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+   ```
+
+4. Update the package list and check available versions of kubeadm:
+   ```bash
+   sudo apt-get update
+   apt-cache policy kubeadm
+   ```
+
+   This command will show you the installed version and the versions available for installation. For example:
+
+   ```
+   kubeadm:
+     Installed: 1.30.0-1.1
+     Candidate: 1.31.1-1.1
+     Version table:
+        1.31.1-1.1 500
+           500 https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+        1.31.0-1.1 500
+           500 https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+    *** 1.30.0-1.1 100
+           100 /var/lib/dpkg/status
+   ```
+
+5. Install the desired version of kubeadm:
+   ```bash
+   sudo apt-get install -y kubelet=1.31.1-1.1 kubeadm=1.31.1-1.1 kubectl=1.31.1-1.1
+   sudo apt-mark hold kubelet kubeadm kubectl
+   ```
+
+   Replace `1.31.1-1.1` with the version you want to install.
+
+6. Verify the upgrade:
+   ```bash
+   kubeadm version
+   ```
+
+## Upgrading Your Cluster
+
+Once kubeadm is upgraded, you can use it to upgrade your cluster:
+
+1. Plan the upgrade:
+   ```bash
+   sudo kubeadm upgrade plan
+   ```
+   This will show you the components that will be upgraded.
+
+2. Apply the upgrade:
+   ```bash
+   sudo kubeadm upgrade apply <version>
+   ```
+   Replace `<version>` with the version you're upgrading to.
+
+3. Upgrade kubelet and kubectl on all nodes:
+   ```bash
+   sudo apt-get install kubelet=<version> kubectl=<version>
+   sudo systemctl daemon-reload
+   sudo systemctl restart kubelet
+   ```
+
+Remember to drain nodes before upgrading and uncordon them after the upgrade is complete.
+
+:::tip
+Always refer to the official Kubernetes documentation for the most up-to-date and detailed upgrade instructions.
+:::

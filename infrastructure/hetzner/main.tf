@@ -63,6 +63,18 @@ resource "hcloud_ssh_key" "default" {
   public_key = file("${path.module}/../keys/hetzner-k8s.pub")
 }
 
+
+
+# CSI Driver config
+resource "local_file" "csi_driver" {
+  content = templatefile("../../kubernetes/base/templates/csi-driver.yaml.tpl", {
+    hcloud_token = var.hcloud_token
+  })
+  filename = "../../kubernetes/base/manifests/hetzner-csi.yaml"
+}
+
+
+
 # Outputs
 output "k8s_node_ip" {
   value       = hcloud_server.k8s_node.ipv4_address
