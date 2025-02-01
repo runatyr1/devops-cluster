@@ -64,14 +64,6 @@ resource "hcloud_ssh_key" "default" {
 }
 
 
-# Add volume resource
-resource "hcloud_volume" "docs_volume" {
-  name     = "docs-volume"
-  size     = 10 # GB
-  location = "hel1"
-  format   = "ext4"
-}
-
 
 # CSI Driver config
 resource "local_file" "csi_driver" {

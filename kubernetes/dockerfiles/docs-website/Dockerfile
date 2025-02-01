@@ -10,7 +10,8 @@ WORKDIR /app
 RUN mkdir -p docs-site && \
     npm create astro@latest ./docs-site -- --yes --template=minimal && \
     cd docs-site && \
-    npm install @astrojs/mdx
+    npm install @astrojs/mdx && \
+    mkdir -p src/pages/docs
 
 # Copy config and entrypoint
 COPY astro.config.mjs ./docs-site/
