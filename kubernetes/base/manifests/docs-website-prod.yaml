@@ -123,7 +123,7 @@ kind: CronJob
 metadata:
   name: docs-sync
 spec:
-  schedule: "*/5 * * * *"
+  schedule: "*/1 * * * *"  # Changed to run every minute as requested
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
@@ -137,12 +137,11 @@ spec:
             - /bin/sh
             - -c
             - |
+              mkdir -p /content && \
               cd /content && \
-              if [ -d .git ]; then 
-                git pull origin main; 
-              else 
-                git clone --branch main --depth 1 https://github.com/runatyr1/devops-cluster.git .; 
-              fi
+              rm -rf * && \  # Clean the directory first
+              git clone --branch main --depth 1 https://github.com/runatyr1/devops-cluster.git . && \
+              echo "Git sync completed at $(date)"
             volumeMounts:
             - name: docs-content
               mountPath: /content
@@ -153,6 +152,7 @@ spec:
             - /bin/sh
             - -c
             - |
+              sleep 5 && \  # Give git sync some time to complete
               curl -X PATCH \
               -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
               -H "Content-Type: application/strategic-merge-patch+json" \
@@ -166,7 +166,7 @@ spec:
           restartPolicy: OnFailure
           serviceAccountName: docs-sa
           volumes:
-          - name: docs-content  # Must match PVC name in cluster
+          - name: docs-content
             persistentVolumeClaim:
               claimName: docs-pvc
           - name: sa-token
