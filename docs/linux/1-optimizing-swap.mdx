@@ -2,41 +2,13 @@
 sidebar_position: 1
 ---
 
-import BrowserOnly from '@docusaurus/BrowserOnly';
 
 # Changing from zram to normal swap
 
-<BrowserOnly>
-{() => {
-  const data = [
-    { name: 'Zram', ram: 'More RAM required', disk: 'Reduces disk I/O', cpu: 'Higher CPU usage' },
-    { name: 'Normal Swap', ram: 'No additional RAM', disk: 'Utilizes disk space', cpu: 'Lower CPU usage' },
-  ];
-
-  return (
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>RAM</th>
-          <th>Disk</th>
-          <th>CPU</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((item, index) => (
-          <tr key={index}>
-            <td>{item.name}</td>
-            <td>{item.ram}</td>
-            <td>{item.disk}</td>
-            <td>{item.cpu}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}}
-</BrowserOnly>
+| Type | RAM | Disk | CPU |
+|------|-----|------|-----|
+| Zram | More RAM required | Reduces disk I/O | Higher CPU usage |
+| Normal Swap | No additional RAM | Utilizes disk space | Lower CPU usage |
 
 ## Checking and Disabling Zram
 

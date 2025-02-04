@@ -2,8 +2,6 @@
 sidebar_position: 3
 ---
 
-import BrowserOnly from '@docusaurus/BrowserOnly';
-
 # Extending `sudo dnf install` Functionality
 
 To extend the functionality of `sudo dnf install` and run a custom script after package installation:
@@ -33,26 +31,4 @@ source ~/.zshrc   # for Zsh
 
 Now, when you run `sudo dnf install package_name`, your custom script will execute after the package installation without affecting other `dnf` subcommands.
 
-<BrowserOnly>
-{() => {
-  const Highlight = ({ children, color }) => (
-    <span
-      style={{
-        backgroundColor: color,
-        borderRadius: '2px',
-        color: '#fff',
-        padding: '0.2rem',
-      }}>
-      {children}
-    </span>
-  );
-
-  return (
-    <div>
-      <p>
-        This modification allows you to <Highlight color="#199434">extend the functionality</Highlight> of the `sudo dnf install` command by running a custom script after the package installation, providing flexibility to perform additional tasks seamlessly.
-      </p>
-    </div>
-  );
-}}
-</BrowserOnly>
+This modification allows you to `extend the functionality` of the `sudo dnf install` command by running a custom script after the package installation, providing flexibility to perform additional tasks seamlessly.
