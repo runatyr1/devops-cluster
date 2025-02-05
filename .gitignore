@@ -13,6 +13,17 @@ infrastructure/*/*.tfvars
 *.tfstate
 *.tfstate.backup
 **/inventory.yml*
+**/.terraform/*
+crash.log
+crash.*.log
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
 
 # Kubernetes
 kubernetes/**/*secret*.yaml
