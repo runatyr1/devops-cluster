@@ -1,15 +1,29 @@
 #!/bin/bash
 
-# Initialize variables for test results
-TOTAL_TESTS=0
-PASSED_TESTS=0
-FAILED_TESTS=0
-
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+
+# Validate working directory
+validate_directory() {
+    local current_dir=$(pwd)
+    if [[ ! "$current_dir" =~ .*/devops-cluster/infrastructure/aws-eks/scripts$ ]]; then
+        echo -e "${RED}Error: Script must be run from the project directory: devops-cluster/infrastructure/aws-eks/scripts${NC}"
+        echo -e "${BLUE}Current directory: ${current_dir}${NC}"
+        echo -e "${BLUE}Please change to the correct directory and try again${NC}"
+        exit 1
+    fi
+}
+
+# Run directory validation
+validate_directory
+
+# Initialize variables for test results
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
 
 # Directory containing test scripts
 TEST_DIR="$(dirname "$0")"
