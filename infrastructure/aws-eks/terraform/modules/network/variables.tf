@@ -33,3 +33,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "peer_vpc_cidr" {
+  description = "CIDR block of the peer VPC"
+  type        = string
+  default     = ""
+}
+
+variable "vpc_peering_connection_id" {
+  description = "ID of the VPC peering connection"
+  type        = string
+  default     = ""
+}

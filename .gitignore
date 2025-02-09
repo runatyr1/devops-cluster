@@ -9,6 +9,7 @@ infrastructure/*/.terraform/
 infrastructure/*/.terraform.lock.hcl
 infrastructure/*/*.tfstate
 infrastructure/*/*.tfstate.*
+**/*.tfstate.*
 infrastructure/*/*.tfvars
 *.tfstate
 *.tfstate.backup
@@ -32,6 +33,7 @@ kubeconfig
 .kube/
 **/kubeconfig*
 kubernetes/base/manifests/hetzner-csi.yaml
+**/*.kubeconfig
 
 # Local environment
 .env
