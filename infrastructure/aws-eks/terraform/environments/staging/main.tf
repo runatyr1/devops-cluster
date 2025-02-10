@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.14.0"
+    }
+  }
+}
+
 
 provider "aws" {
   region = "us-east-1"
@@ -7,6 +16,78 @@ provider "aws" {
 provider "aws" {
   region = "us-west-2"
   alias  = "secondary"
+}
+
+provider "helm" {
+  alias = "primary"
+  kubernetes {
+    host                   = module.eks_primary.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks_primary.cluster_certificate_authority_data)
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks_primary.cluster_name]
+    }
+  }
+}
+
+provider "helm" {
+  alias = "secondary"
+  kubernetes {
+    host                   = module.eks_secondary.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks_secondary.cluster_certificate_authority_data)
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks_secondary.cluster_name]
+    }
+  }
+}
+
+provider "kubernetes" {
+  alias                  = "primary"
+  host                   = module.eks_primary.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks_primary.cluster_certificate_authority_data)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks_primary.cluster_name]
+  }
+}
+
+provider "kubernetes" {
+  alias                  = "secondary"
+  host                   = module.eks_secondary.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks_secondary.cluster_certificate_authority_data)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks_secondary.cluster_name]
+  }
+}
+
+provider "kubectl" {
+  alias                  = "primary"
+  host                   = module.eks_primary.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks_primary.cluster_certificate_authority_data)
+  load_config_file       = false
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks_primary.cluster_name]
+  }
+}
+
+provider "kubectl" {
+  alias                  = "secondary"
+  host                   = module.eks_primary.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks_primary.cluster_certificate_authority_data)
+  load_config_file       = false
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks_primary.cluster_name]
+  }
 }
 
 locals {
@@ -100,7 +181,7 @@ module "eks_primary" {
       min_size       = 1
       max_size       = 3
       desired_size   = 2
-      instance_types = ["t3.micro"]
+      instance_types = ["t3.small"]  # t3.micro gave issues for argocd deploy
       labels = {
         Environment = local.environment
       }
@@ -131,7 +212,7 @@ module "eks_secondary" {
       min_size       = 1
       max_size       = 1
       desired_size   = 1
-      instance_types = ["t3.micro"]
+      instance_types = ["t3.small"]
       subnet_ids     = [module.network_secondary.private_subnets[0]]
       labels = {
         Environment = local.environment
@@ -142,4 +223,38 @@ module "eks_secondary" {
   enable_irsa = true
   authentication_mode = "API"
   cluster_endpoint_public_access = true
+}
+
+module "gitops_primary" {
+  source = "../../modules/gitops"
+  providers = {
+    kubernetes = kubernetes.primary
+    helm       = helm.primary
+    kubectl    = kubectl.primary
+  }
+
+  environment             = local.environment
+  cluster_endpoint       = module.eks_primary.cluster_endpoint
+  cluster_ca_certificate = module.eks_primary.cluster_certificate_authority_data
+  git_repo_url          = "https://github.com/runatyr1/devops-cluster.git"
+  git_revision          = "main"
+  aws_region      = local.primary_region
+  depends_on = [module.eks_primary]
+}
+
+module "gitops_secondary" {
+  source = "../../modules/gitops"
+  providers = {
+    kubernetes = kubernetes.secondary
+    helm       = helm.secondary
+    kubectl    = kubectl.secondary
+  }
+
+  environment             = local.environment
+  cluster_endpoint       = module.eks_secondary.cluster_endpoint
+  cluster_ca_certificate = module.eks_secondary.cluster_certificate_authority_data
+  git_repo_url          = "https://github.com/runatyr1/devops-cluster.git"
+  git_revision          = "main"
+  aws_region      = local.secondary_region
+  depends_on = [module.eks_secondary]
 }

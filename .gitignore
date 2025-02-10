@@ -46,9 +46,10 @@ kubernetes/base/manifests/hetzner-csi.yaml
 *.swp
 .DS_Store
 
-# Scripts output
+# Scripts
 scripts/**/*.out
 scripts/**/*.log
+infrastructure/aws-eks/scripts/aws-nuke/config.yaml
 
 # Hetzner
 **/hcloud.yaml
