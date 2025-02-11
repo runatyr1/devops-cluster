@@ -8,7 +8,7 @@ output "argocd_endpoint" {
   value       = "Use kubectl port-forward svc/argocd-server -n argocd 8080:443"
 }
 
-output "root_application_name" {
-  description = "Name of the root Application"
-  value       = yamldecode(kubectl_manifest.root_application.yaml_body).metadata.name
+output "applicationset_name" {
+ description = "Name of the ApplicationSet"
+ value       = yamldecode(kubectl_manifest.apps_applicationset.yaml_body).metadata.name
 }
