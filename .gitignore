@@ -83,3 +83,6 @@ config/environments/**/*.secret
 
 # Keep these empty directories with .gitkeep
 !infrastructure/keys/.gitkeep
+
+# Other
+z-trash/

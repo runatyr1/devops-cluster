@@ -1,3 +1,0 @@
-# This file is for reference only.
-# The actual ApplicationSet is managed by Terraform in:
-# infrastructure/aws-eks/terraform/modules/gitops/main.tf
