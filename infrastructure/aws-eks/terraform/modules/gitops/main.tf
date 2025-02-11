@@ -172,39 +172,51 @@ resource "helm_release" "argocd" {
   depends_on = [kubernetes_namespace.argocd]
 }
 
-resource "kubectl_manifest" "root_application" {
+
+resource "kubectl_manifest" "apps_applicationset" {
   yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
-    kind = "Application"
+    kind = "ApplicationSet"
     metadata = {
-      name = "${var.environment}-root"
+      name = "${var.environment}-apps"
       namespace = local.argocd_namespace
     }
     spec = {
-      project = "default"
-      source = {
-        repoURL = var.git_repo_url
-        targetRevision = var.git_revision
-        path = "kubernetes-aws-eks"
-        directory = {
-          recurse = true
+      generators = [{
+        git = {
+          repoURL = var.git_repo_url
+          revision = var.git_revision
+          directories = [{
+            path = "kubernetes-aws-eks/base/*"
+          }, {
+            path = "kubernetes-aws-eks/overlays/*"
+          }]
         }
-      }
-      destination = {
-        server = "https://kubernetes.default.svc"
-        namespace = "default"
-      }
-      syncPolicy = {
-        automated = {
-          prune = true
-          selfHeal = true
+      }]
+      template = {
+        metadata = {
+          name = "{{path.basename}}"
+          namespace = local.argocd_namespace
+        }
+        spec = {
+          project = "default"
+          source = {
+            repoURL = var.git_repo_url
+            targetRevision = var.git_revision
+            path = "{{path}}"
+          }
+          destination = {
+            server = "https://kubernetes.default.svc"
+            namespace = "{{path.basename}}"
+          }
+          syncPolicy = {
+            automated = {
+              prune = true
+              selfHeal = true
+            }
+          }
         }
       }
     }
   })
-
- depends_on = [
-   helm_release.argocd,
-   kubernetes_namespace.argocd
- ]
 }
