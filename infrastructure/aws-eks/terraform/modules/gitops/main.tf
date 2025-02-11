@@ -81,25 +81,26 @@ resource "helm_release" "argocd" {
           }
         }
       }
-      server = {
-        extraArgs = ["--insecure"]
-        service = {
-          type = "LoadBalancer"
+    server = {
+      name = "server"
+      extraArgs = ["--insecure"]
+      service = {
+        type = "LoadBalancer"
+      }
+      ingress = {
+        enabled = true
+      }
+      resources = {
+        limits = {
+          cpu    = "300m"
+          memory = "256Mi"
         }
-        ingress = {
-          enabled = true
-        }
-        resources = {
-          limits = {
-            cpu    = "200m"
-            memory = "256Mi"
-          }
-          requests = {
-            cpu    = "100m"
-            memory = "128Mi"
-          }
+        requests = {
+          cpu    = "150m"
+          memory = "128Mi"
         }
       }
+    }
     controller = {
       name = "application-controller"
       resources = {
@@ -122,19 +123,6 @@ resource "helm_release" "argocd" {
         }
         requests = {
           cpu    = "100m"
-          memory = "128Mi"
-        }
-      }
-    }
-    server = {
-      name = "server"
-      resources = {
-        limits = {
-          cpu    = "300m"     # Needs CPU for UI and API requests
-          memory = "256Mi"
-        }
-        requests = {
-          cpu    = "150m"
           memory = "128Mi"
         }
       }
@@ -184,133 +172,39 @@ resource "helm_release" "argocd" {
   depends_on = [kubernetes_namespace.argocd]
 }
 
-resource "kubectl_manifest" "applicationset" {
- yaml_body = yamlencode({
-   apiVersion = "argoproj.io/v1alpha1"
-   kind       = "ApplicationSet"
-   metadata = {
-     name      = "${var.environment}-apps"
-     namespace = local.argocd_namespace
-   }
-   spec = {
-     generators = [{
-       git = {
-         repoURL = var.git_repo_url
-         revision = var.git_revision
-         directories = [{
-           path = "kubernetes-aws-eks/base/*"
-           exclude = true
-         }, {
-           path = "kubernetes-aws-eks/apps/*"
-           exclude = true
-         }]
-       }
-     }]
-     template = {
-       metadata = {
-         name = "{{path.basename}}"
-       }
-       spec = {
-         project = "default"
-         source = {
-           repoURL = var.git_repo_url
-           targetRevision = var.git_revision
-           path = "{{path}}"
-         }
-         destination = {
-           server = "https://kubernetes.default.svc"
-           namespace = "{{path.basename}}"
-         }
-         syncPolicy = {
-           automated = {
-             prune = true
-             selfHeal = true
-           }
-         }
-       }
-     }
-   }
- })
+resource "kubectl_manifest" "root_application" {
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind = "Application"
+    metadata = {
+      name = "${var.environment}-root"
+      namespace = local.argocd_namespace
+    }
+    spec = {
+      project = "default"
+      source = {
+        repoURL = var.git_repo_url
+        targetRevision = var.git_revision
+        path = "kubernetes-aws-eks"
+        directory = {
+          recurse = true
+        }
+      }
+      destination = {
+        server = "https://kubernetes.default.svc"
+        namespace = "default"
+      }
+      syncPolicy = {
+        automated = {
+          prune = true
+          selfHeal = true
+        }
+      }
+    }
+  })
 
  depends_on = [
    helm_release.argocd,
    kubernetes_namespace.argocd
  ]
-}
-
-
-# RBAC resources
-resource "kubectl_manifest" "argocd_serviceaccount" {
-  yaml_body = yamlencode({
-    apiVersion = "v1"
-    kind = "ServiceAccount"
-    metadata = {
-      name = "argocd-application-controller"
-      namespace = local.argocd_namespace
-    }
-  })
-  depends_on = [kubernetes_namespace.argocd]
-}
-
-resource "kubectl_manifest" "argocd_clusterrole" {
-  yaml_body = yamlencode({
-    apiVersion = "rbac.authorization.k8s.io/v1"
-    kind = "ClusterRole"
-    metadata = {
-      name = "argocd-application-controller"
-    }
-    rules = [{
-      apiGroups = ["*"]
-      resources = ["*"]
-      verbs = ["*"]
-    }]
-  })
-}
-
-resource "kubectl_manifest" "argocd_clusterrolebinding" {
-  yaml_body = yamlencode({
-    apiVersion = "rbac.authorization.k8s.io/v1"
-    kind = "ClusterRoleBinding"
-    metadata = {
-      name = "argocd-application-controller"
-    }
-    roleRef = {
-      apiGroup = "rbac.authorization.k8s.io"
-      kind = "ClusterRole"
-      name = "argocd-application-controller"
-    }
-    subjects = [{
-      kind = "ServiceAccount"
-      name = "argocd-application-controller"
-      namespace = local.argocd_namespace
-    }]
-  })
-}
-
-resource "kubectl_manifest" "argocd_project" {
-  yaml_body = yamlencode({
-    apiVersion = "argoproj.io/v1alpha1"
-    kind = "AppProject"
-    metadata = {
-      name = "webapp"
-      namespace = local.argocd_namespace
-    }
-    spec = {
-      description = "Multi-region webapp project"
-      sourceRepos = ["*"]
-      destinations = [{
-        namespace = "*"
-        server = "*"
-      }]
-      clusterResourceWhitelist = [{
-        group = "*"
-        kind = "*"
-      }]
-      namespaceResourceWhitelist = [{
-        group = "*"
-        kind = "*"
-      }]
-    }
-  })
-  depends_on = [helm_release.argocd]
 }
