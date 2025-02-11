@@ -35,8 +35,7 @@ resource "kubernetes_namespace" "argocd" {
 # Configure AWS Secrets Manager to store ArgoCD secret
 resource "aws_secretsmanager_secret" "argocd_secret" {
   name = "argocd/dex-server-key-${var.environment}-${replace(var.aws_region, "-", "")}"
-
-  
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "argocd_secret" {
@@ -226,4 +225,81 @@ resource "kubectl_manifest" "applicationset" {
    helm_release.argocd,
    kubernetes_namespace.argocd
  ]
+}
+
+
+# RBAC resources
+resource "kubectl_manifest" "argocd_serviceaccount" {
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind = "ServiceAccount"
+    metadata = {
+      name = "argocd-application-controller"
+      namespace = local.argocd_namespace
+    }
+  })
+  depends_on = [kubernetes_namespace.argocd]
+}
+
+resource "kubectl_manifest" "argocd_clusterrole" {
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind = "ClusterRole"
+    metadata = {
+      name = "argocd-application-controller"
+    }
+    rules = [{
+      apiGroups = ["*"]
+      resources = ["*"]
+      verbs = ["*"]
+    }]
+  })
+}
+
+resource "kubectl_manifest" "argocd_clusterrolebinding" {
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind = "ClusterRoleBinding"
+    metadata = {
+      name = "argocd-application-controller"
+    }
+    roleRef = {
+      apiGroup = "rbac.authorization.k8s.io"
+      kind = "ClusterRole"
+      name = "argocd-application-controller"
+    }
+    subjects = [{
+      kind = "ServiceAccount"
+      name = "argocd-application-controller"
+      namespace = local.argocd_namespace
+    }]
+  })
+}
+
+resource "kubectl_manifest" "argocd_project" {
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind = "AppProject"
+    metadata = {
+      name = "webapp"
+      namespace = local.argocd_namespace
+    }
+    spec = {
+      description = "Multi-region webapp project"
+      sourceRepos = ["*"]
+      destinations = [{
+        namespace = "*"
+        server = "*"
+      }]
+      clusterResourceWhitelist = [{
+        group = "*"
+        kind = "*"
+      }]
+      namespaceResourceWhitelist = [{
+        group = "*"
+        kind = "*"
+      }]
+    }
+  })
+  depends_on = [helm_release.argocd]
 }
