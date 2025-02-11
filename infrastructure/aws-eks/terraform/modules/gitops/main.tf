@@ -73,13 +73,21 @@ resource "helm_release" "argocd" {
           secretKey = data.aws_secretsmanager_secret_version.argocd_secret.secret_string
         }
       }
+      configs = {
+        repositories = {
+          git-repo = {
+            url = var.git_repo_url
+            type = "git"
+          }
+        }
+      }
       server = {
         extraArgs = ["--insecure"]
         service = {
-          type = "ClusterIP"
+          type = "LoadBalancer"
         }
         ingress = {
-          enabled = false
+          enabled = true
         }
         resources = {
           limits = {
@@ -190,8 +198,11 @@ resource "kubectl_manifest" "applicationset" {
          repoURL = var.git_repo_url
          revision = var.git_revision
          directories = [{
-           path = "kubernetes-aws-eks"
-           recurse = true
+           path = "kubernetes-aws-eks/base/*"
+           exclude = true
+         }, {
+           path = "kubernetes-aws-eks/apps/*"
+           exclude = true
          }]
        }
      }]
