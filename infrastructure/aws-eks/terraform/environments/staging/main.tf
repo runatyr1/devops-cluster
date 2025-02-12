@@ -212,7 +212,7 @@ module "eks_secondary" {
       min_size       = 1
       max_size       = 1
       desired_size   = 1
-      instance_types = ["t3.small"]
+      instance_types = ["t3.medium"]
       subnet_ids     = [module.network_secondary.private_subnets[0]]
       labels = {
         Environment = local.environment

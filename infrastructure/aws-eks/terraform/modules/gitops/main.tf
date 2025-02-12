@@ -219,4 +219,9 @@ resource "kubectl_manifest" "apps_applicationset" {
       }
     }
   })
+   depends_on = [
+   helm_release.argocd,
+   kubernetes_namespace.argocd
+ ]
 }
+
