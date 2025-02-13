@@ -3,9 +3,10 @@ name: umbrella-chart
 description: Umbrella chart for region-specific applications
 version: 0.1.0
 dependencies:
-  - name: iot-simulator
-    version: "0.1.0"
-    repository: "file://../iot-simulator"
+# temporarily disabled iot-simulator, as it is needed for a harder refresh afer adding - CreateNamespace=true to root application
+#  - name: iot-simulator 
+#    version: "0.1.0"
+#    repository: "file://../iot-simulator"
 #  - name: metrics-collector  #sample entry for other application
 #    version: "1.2.0"
 #    repository: "file://../metrics-collector"

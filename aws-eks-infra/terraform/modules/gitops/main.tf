@@ -253,6 +253,9 @@ resource "kubectl_manifest" "region_apps" {
           prune = true
           selfHeal = true
         }
+        syncOptions = [
+          "CreateNamespace=true"
+        ]
       }
     }
   })
