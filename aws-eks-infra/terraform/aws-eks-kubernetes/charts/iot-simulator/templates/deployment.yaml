@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-simulator
+  labels:
+    app: iot-simulator
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: iot-simulator
+  template:
+    metadata:
+      labels:
+        app: iot-simulator
+    spec:
+      containers:
+      - name: iot-simulator
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        envFrom:
+        - configMapRef:
+            name: iot-simulator-config
