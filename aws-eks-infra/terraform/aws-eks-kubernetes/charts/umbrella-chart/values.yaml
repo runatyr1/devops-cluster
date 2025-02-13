@@ -1,0 +1,2 @@
+# Default values (can be empty or contain common settings)
+iot-simulator: {}

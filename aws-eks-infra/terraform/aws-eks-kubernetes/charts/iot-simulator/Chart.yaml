@@ -1,0 +1,4 @@
+apiVersion: v2
+name: iot-simulator
+description: IoT Simulator Application
+version: 0.1.0

@@ -225,3 +225,39 @@ resource "kubectl_manifest" "apps_applicationset" {
  ]
 }
 
+
+resource "kubectl_manifest" "region_apps" {
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind = "Application"
+    metadata = {
+      name = "${var.environment}-region-apps"
+      namespace = local.argocd_namespace
+    }
+    spec = {
+      project = "default"
+      source = {
+        repoURL = var.git_repo_url
+        targetRevision = var.git_revision
+        path = "aws-eks-kubernetes/charts/umbrella-chart"
+        helm = {
+          valueFiles = ["values-${var.aws_region}.yaml"]
+        }
+      }
+      destination = {
+        server = "https://kubernetes.default.svc"
+        namespace = "default"
+      }
+      syncPolicy = {
+        automated = {
+          prune = true
+          selfHeal = true
+        }
+      }
+    }
+  })
+   depends_on = [
+   helm_release.argocd,
+   kubernetes_namespace.argocd
+ ]
+}
