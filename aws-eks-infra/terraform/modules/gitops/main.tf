@@ -226,41 +226,63 @@ resource "kubectl_manifest" "apps_applicationset" {
 }
 
 
-resource "kubectl_manifest" "region_apps" {
+
+
+resource "kubectl_manifest" "chart_applicationset" {
   yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
-    kind = "Application"
+    kind       = "ApplicationSet"
     metadata = {
-      name = "${var.environment}-region-apps"
+      name      = "${var.environment}-charts"
       namespace = local.argocd_namespace
     }
     spec = {
-      project = "default"
-      source = {
-        repoURL = var.git_repo_url
-        targetRevision = var.git_revision
-        path = "aws-eks-kubernetes/charts/umbrella-chart"
-        helm = {
-          valueFiles = ["values-${var.aws_region}.yaml"]
+      generators = [{
+        git = {
+          repoURL  = var.git_repo_url
+          revision = var.git_revision
+          directories = [
+            {
+              path = "aws-eks-kubernetes/charts/*"
+            },
+            {
+              path    = "aws-eks-kubernetes/charts/umbrella-chart"  # Explicitly exclude umbrella
+              exclude = true
+            }
+          ]
         }
-      }
-      destination = {
-        server = "https://kubernetes.default.svc"
-        namespace = "default"
-      }
-      syncPolicy = {
-        automated = {
-          prune = true
-          selfHeal = true
+      }]
+      template = {
+        metadata = {
+          name      = "{{path.basename}}"  # e.g., "iot-simulator"
+          namespace = local.argocd_namespace
         }
-        syncOptions = [
-          "CreateNamespace=true"
-        ]
+        spec = {
+          project = "default"
+          source = {
+            repoURL        = var.git_repo_url
+            targetRevision = var.git_revision
+            path           = "aws-eks-kubernetes/charts/{{path.basename}}"  # Subchart directory
+            helm = {
+              # Key change: Reference values from the umbrella chart
+              valueFiles = [
+                "../umbrella-chart/values-${var.aws_region}.yaml"  # Relative path to umbrella
+              ]
+            }
+          }
+          destination = {
+            server    = "https://kubernetes.default.svc"
+            namespace = "{{path.basename}}"
+          }
+          syncPolicy = {
+            automated = {
+              prune    = true
+              selfHeal = true
+            }
+            syncOptions = ["CreateNamespace=true"]
+          }
+        }
       }
     }
   })
-   depends_on = [
-   helm_release.argocd,
-   kubernetes_namespace.argocd
- ]
 }

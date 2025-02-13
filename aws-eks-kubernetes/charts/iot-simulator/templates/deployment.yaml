@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: iot-simulator
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         envFrom:
