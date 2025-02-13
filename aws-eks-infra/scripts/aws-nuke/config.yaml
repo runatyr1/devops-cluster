@@ -1,0 +1,101 @@
+regions:
+- global
+- us-east-1 
+- us-west-2
+
+blocklist:
+- "000000000000"  # Dummy account ID to satisfy safety check
+
+resource-types:
+  excludes:
+    # IAM Users and related resources
+    - IAMUser
+    - IAMUserAccessKey
+    - IAMUserGroupAttachment
+    - IAMUserHTTPSGitCredential
+    - IAMUserMFADevice
+    - IAMUserPolicy
+    - IAMUserPolicyAttachment
+    - IAMUserSSHPublicKey
+    
+    # IAM Roles and related resources
+    - IAMRole
+    - IAMRolePolicy
+    - IAMRolePolicyAttachment
+    - IAMRolesAnywhereCRL
+    - IAMRolesAnywhereProfile
+    - IAMRolesAnywhereTrustAnchor
+    
+    # IAM Groups and related resources
+    - IAMGroup
+    - IAMGroupPolicy
+    - IAMGroupPolicyAttachment
+    
+    # Other IAM resources
+    - IAMInstanceProfile
+    - IAMInstanceProfileRole
+    - IAMOpenIDConnectProvider
+    - IAMPolicy
+    - IAMSAMLProvider
+    - IAMServerCertificate
+    - IAMServiceSpecificCredential
+    - IAMSigningCertificate
+    - IAMVirtualMFADevice
+    - IAMLoginProfile
+    - IAMAccountSettingPasswordPolicy
+    
+    # Identity Center (SSO) and Cognito resources
+    - SSOAdminInstance
+    - SSOAdminPermissionSet
+    - SSOAdminManagedPolicyAttachment
+    - SSOAdminCustomerManagedPolicyAttachment
+    - SSOAdminPermissionsBoundary
+    - SSOAdminAccountAssignment
+    - CognitoIdentityPool
+    - CognitoIdentityProvider
+    - CognitoUserPool
+    - CognitoUserPoolClient
+    - CognitoUserPoolDomain
+    
+    # Access Analysis and Resource Access Manager
+    - AccessAnalyzer
+    - AccessAnalyzerArchiveRule
+    
+    # Security Credentials and Certificates
+    - ACMPCACertificateAuthority
+    - ACMPCACertificateAuthorityState
+    - SecretsManagerSecret
+
+
+
+accounts:
+  "473340819522": # main account
+    presets:
+    - "iam-preserve"  # Using presets for cleaner config
+
+presets:
+  iam-preserve:
+    filters:
+      # IAM Resources
+      IAMUser:
+      - type: glob
+        value: "*"
+      IAMRole:
+      - type: glob 
+        value: "*"
+      IAMGroup:
+      - type: glob
+        value: "*"
+      IAMPolicy:
+      - type: glob
+        value: "*"
+      # Identity Center
+      IdentityStoreUser:
+      - type: glob
+        value: "*"
+      IdentityStore:
+      - type: exact
+        value: "d-9067c451a0"
+      SSOAdministrator:
+      - type: glob
+        value: "*"

@@ -187,9 +187,9 @@ resource "kubectl_manifest" "apps_applicationset" {
           repoURL = var.git_repo_url
           revision = var.git_revision
           directories = [{
-            path = "kubernetes-aws-eks/base/*"
+            path = "aws-eks-kubernetes/base/*"
           }, {
-            path = "kubernetes-aws-eks/overlays/*"
+            path = "aws-eks-kubernetes/overlays/*"
           }]
         }
       }]
