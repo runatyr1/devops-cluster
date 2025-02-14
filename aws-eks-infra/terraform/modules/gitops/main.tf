@@ -168,7 +168,6 @@ resource "helm_release" "argocd" {
     }
    })
   ]
-
   depends_on = [kubernetes_namespace.argocd]
 }
 
@@ -244,17 +243,13 @@ resource "kubectl_manifest" "chart_applicationset" {
           directories = [
             {
               path = "aws-eks-kubernetes/charts/*"
-            },
-            {
-              path    = "aws-eks-kubernetes/charts/umbrella-chart"  # Explicitly exclude umbrella
-              exclude = true
             }
           ]
         }
       }]
       template = {
         metadata = {
-          name      = "{{path.basename}}"  # e.g., "iot-simulator"
+          name      = "{{path.basename}}"
           namespace = local.argocd_namespace
         }
         spec = {
@@ -262,12 +257,9 @@ resource "kubectl_manifest" "chart_applicationset" {
           source = {
             repoURL        = var.git_repo_url
             targetRevision = var.git_revision
-            path           = "aws-eks-kubernetes/charts/{{path.basename}}"  # Subchart directory
+            path           = "aws-eks-kubernetes/charts/{{path.basename}}"
             helm = {
-              # Key change: Reference values from the umbrella chart
-              valueFiles = [
-                "../umbrella-chart/values-${var.aws_region}.yaml"  # Relative path to umbrella
-              ]
+              valueFiles = ["/aws-eks-kubernetes/charts/{{path.basename}}/values-${var.aws_region}.yaml"]
             }
           }
           destination = {
@@ -285,4 +277,8 @@ resource "kubectl_manifest" "chart_applicationset" {
       }
     }
   })
+   depends_on = [
+   helm_release.argocd,
+   kubernetes_namespace.argocd
+ ]
 }
