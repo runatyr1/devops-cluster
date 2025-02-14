@@ -1,7 +1,0 @@
-iot-simulator:
-  aws:
-    region: us-west-2
-    accountId: "473340819522"
-  image:
-    repository: 473340819522.dkr.ecr.us-west-2.amazonaws.com/iot-simulator
-    tag: latest
